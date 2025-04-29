@@ -3995,9 +3995,7 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(XXH_NOESCAPE const XXH64_can
 #endif
 
 #ifndef XXH_VECTOR    /* can be defined on command line */
-#  if defined(__ARM_FEATURE_SVE)
-#    define XXH_VECTOR XXH_SVE
-#  elif ( \
+#  if ( \
         defined(__ARM_NEON__) || defined(__ARM_NEON) /* gcc */ \
      || defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC) /* msvc */ \
      || (defined(__wasm_simd128__) && XXH_HAS_INCLUDE(<arm_neon.h>)) /* wasm simd128 via SIMDe */ \
@@ -4006,6 +4004,8 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(XXH_NOESCAPE const XXH64_can
     || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) \
    )
 #    define XXH_VECTOR XXH_NEON
+#  elif defined(__ARM_FEATURE_SVE)
+#    define XXH_VECTOR XXH_SVE
 #  elif defined(__AVX512F__)
 #    define XXH_VECTOR XXH_AVX512
 #  elif defined(__AVX2__)
