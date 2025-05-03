@@ -322,7 +322,7 @@ jobs:
 
     - name: cmake
       run: |
-        cd cmake_unofficial
+        cd build/cmake
         cmake -Bbuild
         cd build
         CFLAGS=-Werror make
@@ -331,7 +331,7 @@ jobs:
 
     - name: cmake pkgconfig generation
       run: |
-        cd cmake_unofficial
+        cd build/cmake
         pwd
         ls
         rm -rf build
@@ -346,20 +346,20 @@ jobs:
         cd cmake_bins
         wget https://cmake.org/files/v3.10/cmake-3.10.0-Linux-x86_64.tar.gz
         tar xzf cmake-3.10.0-Linux-x86_64.tar.gz
-        cd ../cmake_unofficial
+        cd ../build/cmake
         rm -rf build
         pwd
         ls
         mkdir -p build
         cd build
-        ../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --version
-        ../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake ..
-        ../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --build .
+        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --version
+        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake ..
+        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --build .
         mkdir -p test_install_dir
-        DESTDIR=test_install_dir ../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --install .
+        DESTDIR=test_install_dir ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --install .
         rm -rf *
-        ../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake -DCMAKE_BUILD_TYPE=Debug ..
-        ../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --build .
+        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake -DCMAKE_BUILD_TYPE=Debug ..
+        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --build .
 
 
 
@@ -513,7 +513,7 @@ jobs:
 
     - name: Build ${{ matrix.system.os }}, ${{ matrix.arch }}
       run: |
-        cd cmake_unofficial
+        cd build/cmake
         mkdir build
         cd build
         cmake .. -DCMAKE_BUILD_TYPE=Release -A ${{ matrix.arch }} -DCMAKE_C_FLAGS="/W4 /WX"
@@ -523,13 +523,13 @@ jobs:
       # Run benchmark for testing only if target arch is x64 or Win32.
       if: ${{ matrix.arch == 'x64' || matrix.arch == 'Win32' }}
       run: |
-        .\cmake_unofficial\build\Release\xxhsum.exe -bi1
+        .\build\cmake\build\Release\xxhsum.exe -bi1
 
     - name: Build ${{ matrix.system.os }}, ${{ matrix.arch }}, with DISPATCH
       # DISPATCH only if target arch is x64 or Win32.
       if: ${{ ( matrix.arch == 'x64' || matrix.arch == 'Win32' ) }}
       run: |
-        cd cmake_unofficial
+        cd build/cmake
         mkdir build-visual-dispatch
         cd build-visual-dispatch
         cmake .. -DCMAKE_BUILD_TYPE=Release -DDISPATCH=ON -A x64 -DCMAKE_C_FLAGS="/W4 /WX"
@@ -539,14 +539,14 @@ jobs:
       # Run benchmark for testing only if target arch is x64 or Win32.
       if: ${{ ( matrix.arch == 'x64' || matrix.arch == 'Win32' ) }}
       run: |
-        .\cmake_unofficial\build-visual-dispatch\Release\xxhsum.exe -V | grep autoVec
-        .\cmake_unofficial\build-visual-dispatch\Release\xxhsum.exe -bi1
+        .\build\cmake\build-visual-dispatch\Release\xxhsum.exe -V | grep autoVec
+        .\build\cmake\build-visual-dispatch\Release\xxhsum.exe -bi1
 
 
     - name: Build ${{ matrix.system.os }}, clang-cl, ${{ matrix.arch }}
       if: ${{ matrix.system.clangcl == 'true' }}
       run: |
-        cd cmake_unofficial
+        cd build/cmake
         mkdir build-clang-cl
         cd build-clang-cl
         cmake .. -DCMAKE_BUILD_TYPE=Release -A x64 -DCMAKE_GENERATOR_TOOLSET=ClangCL
@@ -556,7 +556,7 @@ jobs:
       # Run benchmark for testing only if target arch is x64 or Win32.
       if: ${{ matrix.system.clangcl == 'true' && ( matrix.arch == 'x64' || matrix.arch == 'Win32' ) }}
       run: |
-        .\cmake_unofficial\build-clang-cl\Release\xxhsum.exe -bi1
+        .\build\cmake\build-clang-cl\Release\xxhsum.exe -bi1
 
 
 
