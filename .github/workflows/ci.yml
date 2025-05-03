@@ -320,46 +320,77 @@ jobs:
         echo && make -v
         echo && cat /proc/cpuinfo || echo /proc/cpuinfo is not present
 
-    - name: cmake
+    - name: Configure, build & stage (CMake)
       run: |
-        cd build/cmake
-        cmake -Bbuild
-        cd build
-        CFLAGS=-Werror make
-        mkdir -p test_install_dir
-        DESTDIR=test_install_dir cmake --install .
+        BUILD_DIR="${{ github.workspace }}/cmakebuild"
 
-    - name: cmake pkgconfig generation
+        # 1) configure
+        cmake -S build/cmake -B "$BUILD_DIR" \
+              -DCMAKE_C_FLAGS="-Werror" \
+              -DCMAKE_INSTALL_PREFIX=/usr  # real prefix inside DESTDIR
+
+        # 2) build (uses default Makefile generator on Linux runners)
+        cmake --build "$BUILD_DIR" --parallel
+
+        # 3) staged install
+        DESTDIR="$BUILD_DIR/stage" cmake --install "$BUILD_DIR" --prefix /usr
+
+    - name: Generate & validate libxxhash.pc (CMake)
       run: |
-        cd build/cmake
-        pwd
-        ls
-        rm -rf build
-        cmake -Bbuild -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_INCLUDEDIR=/usr/include -DCMAKE_INSTALL_LIBDIR=/usr/lib
-        echo "checking content of libxxhash.pc"
-        cat build/libxxhash.pc | grep "libdir=/usr/lib"
-        cat build/libxxhash.pc | grep "includedir=/usr/include"
+        SRC_DIR=build/cmake
+        BUILD_PKG_DIR="${{ github.workspace }}/cmakebuildpkg"
+
+        # 1) configure an out‑of‑tree build that writes the .pc file
+        cmake -S "$SRC_DIR" -B "$BUILD_PKG_DIR" \
+              -DCMAKE_INSTALL_PREFIX=/usr \
+              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
+              -DCMAKE_INSTALL_LIBDIR=/usr/lib
+
+        # 2) sanity‑check the resulting pkg‑config file
+        PC_FILE="$BUILD_PKG_DIR/libxxhash.pc"
+        test -f "$PC_FILE"                            # file exists
+        grep -q '^libdir=/usr/lib$' "$PC_FILE"
+        grep -q '^includedir=/usr/include$' "$PC_FILE"
 
     - name: cmake minimum version v3.10 test
       run: |
-        mkdir -p cmake_bins
-        cd cmake_bins
-        wget https://cmake.org/files/v3.10/cmake-3.10.0-Linux-x86_64.tar.gz
-        tar xzf cmake-3.10.0-Linux-x86_64.tar.gz
-        cd ../build/cmake
-        rm -rf build
-        pwd
-        ls
-        mkdir -p build
-        cd build
-        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --version
-        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake ..
-        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --build .
-        mkdir -p test_install_dir
-        DESTDIR=test_install_dir ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --install .
-        rm -rf *
-        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake -DCMAKE_BUILD_TYPE=Debug ..
-        ../../../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --build .
+        CMAKE_VERSION="3.10.0"
+        CMAKE_MAJOR_MINOR="3.10"
+        BASE_DIR="$(pwd)"
+        DOWNLOAD_DIR="${BASE_DIR}/cmake_download"
+        CMAKE_BIN_DIR="${DOWNLOAD_DIR}/cmake-${CMAKE_VERSION}-Linux-x86_64"
+        CMAKE_BIN="${CMAKE_BIN_DIR}/bin/cmake"
+        BUILD_DIR="${BASE_DIR}/cmake_build"
+        INSTALL_TEST_DIR="${BASE_DIR}/cmake_install_test"
+
+        # Create necessary directories
+        mkdir -p "${DOWNLOAD_DIR}" "${BUILD_DIR}" "${INSTALL_TEST_DIR}"
+
+        # Download and extract CMake
+        echo "Downloading CMake ${CMAKE_VERSION}..."
+        wget "https://cmake.org/files/v${CMAKE_MAJOR_MINOR}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz" -P "${DOWNLOAD_DIR}"
+        tar xzf "${DOWNLOAD_DIR}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz" -C "${DOWNLOAD_DIR}"
+
+        # Verify CMake version
+        echo "Using CMake version:"
+        "${CMAKE_BIN}" --version
+
+        # Configure the build
+        echo "Configuring build..."
+        (cd "${BUILD_DIR}" && "${CMAKE_BIN}" "${BASE_DIR}/build/cmake")
+
+        # Build the project
+        echo "Building project..."
+        "${CMAKE_BIN}" --build "${BUILD_DIR}"
+
+        # Install to test directory
+        echo "Installing to test directory..."
+        DESTDIR="${INSTALL_TEST_DIR}" "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install
+
+        echo "Test completed successfully with cmake ${CMAKE_VERSION}"
+
+        # cleaning
+        rm -rf "${DOWNLOAD_DIR}" "${BUILD_DIR}" "${INSTALL_TEST_DIR}"
 
 
 
