@@ -36,6 +36,7 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER := $(LIBVER_MAJOR).$(LIBVER_MINOR).$(LIBVER_PATCH)
 
+MAKEFLAGS += --no-print-directory
 CFLAGS ?= -O3
 DEBUGFLAGS+=-Wall -Wextra -Wconversion -Wcast-qual -Wcast-align -Wshadow \
             -Wstrict-aliasing=1 -Wswitch-enum -Wdeclaration-after-statement \
@@ -95,7 +96,7 @@ XXHSUM_OBJS = $(XXHSUM_SRCS_FLAT:.c=.o)
 default: DEBUGFLAGS=
 default: lib xxhsum_and_links
 
-C_SRCDIRS = . $(XXHSUM_SRC_DIR)
+C_SRCDIRS = . $(XXHSUM_SRC_DIR) fuzz
 include build/make/multiconf.make
 
 .PHONY: all
@@ -177,8 +178,6 @@ clean: clean_cache
 	$(RM) core *.o *.obj *.$(SHARED_EXT) *.$(SHARED_EXT).* *.a libxxhash.pc
 	$(RM) xxhsum.wasm xxhsum.js xxhsum.html
 	$(RM) xxh32sum$(EXT) xxh64sum$(EXT) xxh128sum$(EXT) xxh3sum$(EXT)
-	$(RM) fuzzer
-	$(RM) $(XXHSUM_SRC_DIR)/*.o $(XXHSUM_SRC_DIR)/*.obj
 	$(MAKE) -C tests clean
 	$(MAKE) -C tests/bench clean
 	$(MAKE) -C tests/collisions clean
@@ -315,11 +314,13 @@ test-xxhsum-c: xxhsum
 	cat .test.filenames | $(RUN_ENV) ./xxhsum$(EXT) --filelist
 	@$(RM) .test.*
 
-LIB_FUZZING_ENGINE?="-fsanitize=fuzzer"
-CC_VERSION := $(shell $(CC) --version)
+CC_VERSION := $(shell $(CC) --version 2>/dev/null)
 ifneq (,$(findstring clang,$(CC_VERSION)))
-fuzzer: libxxhash.a fuzz/fuzzer.c
-	$(CC) $(CFLAGS) $(LIB_FUZZING_ENGINE) -I. -o fuzzer fuzz/fuzzer.c -L. -Wl,-Bstatic -lxxhash -Wl,-Bdynamic
+fuzzer: CFLAGS += -fsanitize=fuzzer
+fuzzer: LDFLAGS += -L. -Wl,-Bstatic -lxxhash -Wl,-Bdynamic
+$(eval $(call c_program,fuzzer, fuzzer.o xxhash.o))
+else
+fuzzer: this_target_requires_clang # intentional fail
 endif
 
 .PHONY: test-filename-escape
