@@ -544,51 +544,76 @@ jobs:
 
     - name: Build ${{ matrix.system.os }}, ${{ matrix.arch }}
       run: |
-        cd build/cmake
-        mkdir build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -A ${{ matrix.arch }} -DCMAKE_C_FLAGS="/W4 /WX"
-        cmake --build . --config Release
+        $ErrorActionPreference = "Stop"
+        $SRC_DIR   = "build/cmake"
+        $BUILD_DIR = "$env:GITHUB_WORKSPACE\cmake_visual_${{ matrix.arch }}"
 
-    - name: Test
+        cmake -S $SRC_DIR -B $BUILD_DIR `
+              -DCMAKE_BUILD_TYPE=Release `
+              -A "${{ matrix.arch }}" `
+              -DCMAKE_C_FLAGS="/W4 /WX" `
+              -DCMAKE_INSTALL_PREFIX="C:/install"
+
+        cmake --build $BUILD_DIR --config Release --parallel
+        cmake --install $BUILD_DIR --config Release --prefix "C:/install"
+
+    - name: Test produced binary
       # Run benchmark for testing only if target arch is x64 or Win32.
       if: ${{ matrix.arch == 'x64' || matrix.arch == 'Win32' }}
       run: |
-        .\build\cmake\build\Release\xxhsum.exe -bi1
+        C:\install\bin\xxhsum.exe -V
+        C:\install\bin\xxhsum.exe -bi1
+
 
     - name: Build ${{ matrix.system.os }}, ${{ matrix.arch }}, with DISPATCH
       # DISPATCH only if target arch is x64 or Win32.
       if: ${{ ( matrix.arch == 'x64' || matrix.arch == 'Win32' ) }}
       run: |
-        cd build/cmake
-        mkdir build-visual-dispatch
-        cd build-visual-dispatch
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DDISPATCH=ON -A x64 -DCMAKE_C_FLAGS="/W4 /WX"
-        cmake --build . --config Release
+        $ErrorActionPreference = "Stop"
+        $SRC_DIR   = "build/cmake"
+        $BUILD_DIR = "$env:GITHUB_WORKSPACE\cmake_visual_dispatch_${{ matrix.arch }}"
+
+        cmake -S $SRC_DIR -B $BUILD_DIR `
+              -DCMAKE_BUILD_TYPE=Release `
+              -A "${{ matrix.arch }}" `
+              -DDISPATCH=ON `
+              -DCMAKE_C_FLAGS="/W4 /WX" `
+              -DCMAKE_INSTALL_PREFIX="C:/install_dispatch"
+
+        cmake --build $BUILD_DIR --config Release --parallel
+        cmake --install $BUILD_DIR --config Release --prefix "C:/install_dispatch"
 
     - name: Runtime Test (DISPATCH)
       # Run benchmark for testing only if target arch is x64 or Win32.
       if: ${{ ( matrix.arch == 'x64' || matrix.arch == 'Win32' ) }}
       run: |
-        .\build\cmake\build-visual-dispatch\Release\xxhsum.exe -V | grep autoVec
-        .\build\cmake\build-visual-dispatch\Release\xxhsum.exe -bi1
+        C:\install_dispatch\bin\xxhsum.exe -V | grep autoVec
+        C:\install_dispatch\bin\xxhsum.exe -bi1
 
 
     - name: Build ${{ matrix.system.os }}, clang-cl, ${{ matrix.arch }}
       if: ${{ matrix.system.clangcl == 'true' }}
       run: |
-        cd build/cmake
-        mkdir build-clang-cl
-        cd build-clang-cl
-        cmake .. -DCMAKE_BUILD_TYPE=Release -A x64 -DCMAKE_GENERATOR_TOOLSET=ClangCL
-        cmake --build . --config Release
+        $ErrorActionPreference = "Stop"
+        $SRC_DIR   = "build/cmake"
+        $BUILD_DIR = "$env:GITHUB_WORKSPACE\cmake_visual_cl_${{ matrix.arch }}"
+
+        cmake -S $SRC_DIR -B $BUILD_DIR `
+              -DCMAKE_BUILD_TYPE=Release `
+              -A "${{ matrix.arch }}" `
+              -DCMAKE_GENERATOR_TOOLSET=ClangCL `
+              -DCMAKE_C_FLAGS="/W4 /WX" `
+              -DCMAKE_INSTALL_PREFIX="C:/install_cl"
+
+        cmake --build $BUILD_DIR --config Release --parallel
+        cmake --install $BUILD_DIR --config Release --prefix "C:/install_cl"
 
     - name: Test (clang-cl)
       # Run benchmark for testing only if target arch is x64 or Win32.
       if: ${{ matrix.system.clangcl == 'true' && ( matrix.arch == 'x64' || matrix.arch == 'Win32' ) }}
       run: |
-        .\build\cmake\build-clang-cl\Release\xxhsum.exe -bi1
-
+        C:\install_cl\bin\xxhsum.exe -V
+        C:\install_cl\bin\xxhsum.exe -bi1
 
 
   # Windows, { mingw64, mingw32 }
