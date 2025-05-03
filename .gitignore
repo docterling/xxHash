@@ -33,7 +33,7 @@ fuzzer
 *.js
 
 # CMake build directories
-build*/
+cmakebuild/
 
 # project managers artifacts
 .projectile
