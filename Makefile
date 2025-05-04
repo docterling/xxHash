@@ -338,27 +338,27 @@ test-cli-ignore-missing:
 	$(MAKE) -C tests test_cli_ignore_missing
 
 .PHONY: armtest
-armtest: clean
+armtest:
 	@echo ---- test ARM compilation ----
 	CC=arm-linux-gnueabi-gcc MOREFLAGS="-Werror -static" $(MAKE) xxhsum
 
 .PHONY: arm64test
-arm64test: clean
+arm64test:
 	@echo ---- test ARM64 compilation ----
 	CC=aarch64-linux-gnu-gcc MOREFLAGS="-Werror -static" $(MAKE) xxhsum
 
 .PHONY: clangtest
-clangtest: clean
+clangtest:
 	@echo ---- test clang compilation ----
 	CC=clang MOREFLAGS="-Werror -Wconversion -Wno-sign-conversion" $(MAKE) all
 
 .PHONY: gcc-og-test
-gcc-og-test: clean
+gcc-og-test:
 	@echo ---- test gcc -Og compilation ----
 	CFLAGS="-Og -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror -fPIC" CPPFLAGS="-DXXH_NO_INLINE_HINTS" MOREFLAGS="-Werror" $(MAKE) all
 
 .PHONY: cxxtest
-cxxtest: clean
+cxxtest:
 	@echo ---- test C++ compilation ----
 	CC="$(CXX) -Wno-deprecated" $(MAKE) all CFLAGS="-O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror -fPIC"
 
@@ -414,7 +414,6 @@ usan: CC=clang
 usan: CXX=clang++
 usan:  ## check CLI runtime for undefined behavior, using clang's sanitizer
 	@echo ---- check undefined behavior - sanitize ----
-	$(MAKE) clean
 	$(MAKE) test CC=$(CC) CXX=$(CXX) MOREFLAGS="-g -fsanitize=undefined -fno-sanitize-recover=all"
 
 .PHONY: staticAnalyze
