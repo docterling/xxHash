@@ -180,6 +180,7 @@ clean: clean_cache
 	$(RM) core *.o *.obj *.$(SHARED_EXT) *.$(SHARED_EXT).* *.a libxxhash.pc
 	$(RM) xxhsum.wasm xxhsum.js xxhsum.html
 	$(RM) xxh32sum$(EXT) xxh64sum$(EXT) xxh128sum$(EXT) xxh3sum$(EXT)
+	$(RM) fuzzer
 	$(MAKE) -C tests clean
 	$(MAKE) -C tests/bench clean
 	$(MAKE) -C tests/collisions clean
@@ -319,7 +320,6 @@ test-xxhsum-c: xxhsum
 CC_VERSION := $(shell $(CC) --version 2>/dev/null)
 ifneq (,$(findstring clang,$(CC_VERSION)))
 fuzzer: CFLAGS += -fsanitize=fuzzer
-fuzzer: LDFLAGS += -L. -Wl,-Bstatic -lxxhash -Wl,-Bdynamic
 $(eval $(call c_program,fuzzer, fuzz/fuzzer.o xxhash.o))
 else
 fuzzer: this_target_requires_clang # intentional fail
