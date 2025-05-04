@@ -131,6 +131,7 @@ xxhsum_inlinedXXH: CPPFLAGS += -DXXH_INLINE_ALL
 $(eval $(call c_program,xxhsum_inlinedXXH,$(CLI_OBJS)))
 
 
+# =================================================
 # library
 
 libxxhash.a:
@@ -145,11 +146,15 @@ $(LIBXXH): xxh_x86dispatch.c
 endif
 $(LIBXXH): xxhash.c
 	$(CC) $(FLAGS) $^ $(LDFLAGS) $(SONAME_FLAGS) -o $@
-	$(LN) -sf $@ libxxhash.$(SHARED_EXT_MAJOR)
-	$(LN) -sf $@ libxxhash.$(SHARED_EXT)
+
+libxxhash.$(SHARED_EXT_MAJOR): $(LIBXXH)
+	$(LN) -sf $< $@
+
+libxxhash.$(SHARED_EXT): libxxhash.$(SHARED_EXT_MAJOR)
+	$(LN) -sf $< $@
 
 .PHONY: libxxhash  ## generate dynamic xxhash library
-libxxhash: $(LIBXXH)
+libxxhash: $(LIBXXH) libxxhash.$(SHARED_EXT_MAJOR) libxxhash.$(SHARED_EXT)
 
 .PHONY: lib  ## generate static and dynamic xxhash libraries
 lib: libxxhash.a libxxhash
@@ -618,7 +623,7 @@ install_libxxhash: libxxhash
 	$(MAKE_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_PROGRAM) $(LIBXXH) $(DESTDIR)$(LIBDIR)
 	ln -sf $(LIBXXH) $(DESTDIR)$(LIBDIR)/libxxhash.$(SHARED_EXT_MAJOR)
-	ln -sf $(LIBXXH) $(DESTDIR)$(LIBDIR)/libxxhash.$(SHARED_EXT)
+	ln -sf libxxhash.$(SHARED_EXT_MAJOR) $(DESTDIR)$(LIBDIR)/libxxhash.$(SHARED_EXT)
 
 install_libxxhash.includes:
 	$(INSTALL) -d -m 755 $(DESTDIR)$(INCLUDEDIR)   # includes
