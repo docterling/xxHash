@@ -112,7 +112,7 @@ $(CACHE_ROOT)/%/. :
 
 
 define addTargetCObject  # targetName, addlDeps
-$$(intcmp $$(V),2,,$$(info $$(call $(0),$(1),$(2)))) #debug print
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2)))) #debug print
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
 $$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
@@ -122,7 +122,7 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
 endef # addTargetCObject
 
 define addTargetAsmObject  # targetName, addlDeps
-$$(intcmp $$(V),2,,$$(info $$(call $(0),$(1),$(2))))
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
 $$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
@@ -132,7 +132,7 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
 endef # addTargetAsmObject
 
 define addTargetCxxObject  # targetName, addlDeps
-$$(intcmp $$(V),2,,$$(info $$(call $(0),$(1),$(2))))
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
 $$(CACHE_ROOT)/%/$(1) : $(1:.o=.cpp) $(2) | $$(CACHE_ROOT)/%/.
@@ -169,7 +169,7 @@ $(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
 
 define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
-$$(intcmp $$(V),2,,$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
 
 ALL_PROGRAMS += $(1)
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
@@ -185,7 +185,7 @@ endef # static_library
 
 
 define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix, compiler, flags
-$$(intcmp $$(V),2,,$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
 
 ALL_PROGRAMS += $(1)
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
