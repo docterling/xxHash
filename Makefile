@@ -178,7 +178,7 @@ help:  ## list documented targets
 	$(AWK) 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: clean
-clean: clean_cache
+clean:
 	$(RM) -r *.dSYM   # Mac OS-X specific
 	$(RM) core *.o *.obj *.$(SHARED_EXT) *.$(SHARED_EXT).* *.a libxxhash.pc
 	$(RM) xxhsum.wasm xxhsum.js xxhsum.html

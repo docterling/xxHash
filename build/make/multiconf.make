@@ -99,6 +99,14 @@ MKDIR ?= mkdir
 RANLIB ?= ranlib
 LN ?= ln
 
+# Include dependency files
+include $(wildcard $(CACHE_ROOT)/**/*.d)
+include $(wildcard $(CACHE_ROOT)/generic/*/*.d)
+
+# --------------------------------------------------------------------------------------------
+# The following macros are used to create object files in the cache directory.
+# The object files are named after the source file, but with a different path.
+
 # Create build directories on-demand.
 #
 # For some reason, make treats the directory as an intermediate file and tries
@@ -109,13 +117,10 @@ LN ?= ln
 $(CACHE_ROOT)/%/. :
 	$(MKDIR) -p $@
 
-# Include dependency files
-include $(wildcard $(CACHE_ROOT)/**/*.d)
-include $(wildcard $(CACHE_ROOT)/generic/*/*.d)
 
-define addTargetObject  # targetName, addlDeps
+define addTargetCObject  # targetName, addlDeps
 ifeq ($$(V),2)
-$$(info $$(call addTargetObject,$(1)))
+$$(info $$(call $(0),$(1),$(2)))
 endif
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
@@ -123,11 +128,11 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
 	@echo CC $$@
 	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
-endef # addTargetObject
+endef # addTargetCObject
 
 define addTargetAsmObject  # targetName, addlDeps
 ifeq ($$(V),2)
-$$(info $$(call addTargetAsmObject,$(1)))
+$$(info $$(call $(0),$(1),$(2)))
 endif
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
@@ -139,7 +144,7 @@ endef # addTargetAsmObject
 
 define addTargetCxxObject  # targetName, addlDeps
 ifeq ($$(V),2)
-$$(info $$(call addTargetCxxObject,$(1)))
+$$(info $$(call $(0),$(1),$(2)))
 endif
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
@@ -149,6 +154,32 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.cpp) $(2) | $$(CACHE_ROOT)/%/.
 
 endef # addTargetCxxObject
 
+# Create targets for individual object files
+C_SRCDIRS += .
+vpath %.c $(C_SRCDIRS)
+CXX_SRCDIRS += .
+vpath %.cpp $(CXX_SRCDIRS)
+ASM_SRCDIRS += .
+vpath %.S $(ASM_SRCDIRS)
+
+# If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
+C_SRCS   ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
+CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
+ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
+
+# If C_SRCS, CXX_SRCS and ASM_SRCS are not defined, use C_OBJS, CXX_OBJS and ASM_OBJS
+C_OBJS   ?= $(patsubst %.c,%.o,$(C_SRCS))
+CXX_OBJS ?= $(patsubst %.cpp,%.o,$(CXX_SRCS))
+ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
+
+$(foreach OBJ,$(C_OBJS),$(eval $(call addTargetCObject,$(OBJ))))
+$(foreach OBJ,$(CXX_OBJS),$(eval $(call addTargetCxxObject,$(OBJ))))
+$(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
+
+# --------------------------------------------------------------------------------------------
+# The following macros are used to create targets in the user Makefile.
+# Binaries are built in the cache directory, and then symlinked to the current directory.
+# The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
 
 define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
 ifeq ($$(V),2)
@@ -201,32 +232,14 @@ define cxx_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CXX,CXXFLAGS))
 endef # cxx_program_shared_o
 
+# --------------------------------------------------------------------------------------------
 
-# Create targets for individual object files
-C_SRCDIRS += .
-vpath %.c $(C_SRCDIRS)
-CXX_SRCDIRS += .
-vpath %.cpp $(CXX_SRCDIRS)
-ASM_SRCDIRS += .
-vpath %.S $(ASM_SRCDIRS)
-
-# If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
-C_SRCS   ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
-CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
-ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
-
-# If C_SRCS, CXX_SRCS and ASM_SRCS are not defined, use C_OBJS, CXX_OBJS and ASM_OBJS
-C_OBJS   ?= $(patsubst %.c,%.o,$(C_SRCS))
-CXX_OBJS ?= $(patsubst %.cpp,%.o,$(CXX_SRCS))
-ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
-
-$(foreach OBJ,$(C_OBJS),$(eval $(call addTargetObject,$(OBJ))))
-$(foreach OBJ,$(CXX_OBJS),$(eval $(call addTargetCxxObject,$(OBJ))))
-$(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
-
-
-# Cleaning
-
+# Cleaning: delete all objects and binaries created with this script
+.PHONY: clean_cache
 clean_cache:
 	$(RM) -rf $(CACHE_ROOT)
 	$(RM) $(ALL_PROGRAMS)
+
+# automatically attach to standard clean target
+.PHONY: clean
+clean: clean_cache
