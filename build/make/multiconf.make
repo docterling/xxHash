@@ -20,7 +20,7 @@
 #
 # ##########################################################################
 
-# Provides c_program(_shared_o) and cxx_program(_shared_o)
+# Provides c_program(_shared_o), cxx_program(_shared_o) and static_library macros
 # Provides V=1 / VERBOSE=1 support. V=2 is used for debugging purposes.
 # Provides target clean_cache: delete objects and binaries created with this script
 # Support recompilation of only impacted units when an associated *.h is updated.
@@ -34,7 +34,7 @@
 #   C_OBJS, CXX_OBJS and ASM_OBJS variables defined
 #   *and* vpath set to find all source files
 # - directory `cachedObjs/` available to cache object files.
-#   alternatively, set CACHE_ROOT to some different value.
+#   alternatively: set CACHE_ROOT to some different value.
 # Optional:
 # - HASH can be set to a different custom hash program.
 
@@ -43,7 +43,7 @@
 # *_shared_o* variant is an optional optimization variant, that make it possible for multiple targets to share the same objects.
 # However, as a consequence, all these objects must have exactly the same list of flags,
 # which in practice means that there must be no target-level modification (like: target: CFLAGS += someFlag).
-# If unsure, only use the standars variants, c_program and cxx_program.
+# If unsure, only use the standard variants, c_program and cxx_program.
 
 # All *_program* macro functions take up to 4 argument:
 # - The name of the target
@@ -150,6 +150,24 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.cpp) $(2) | $$(CACHE_ROOT)/%/.
 endef # addTargetCxxObject
 
 
+define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
+ifeq ($$(V),2)
+$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5)))
+endif
+
+ALL_PROGRAMS += $(1)
+$$(CACHE_ROOT)/%/$(1) : ARFLAGS ?= rcs
+$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
+	@echo AR $$@
+	$(AR) $$(ARFLAGS) $$@ $$^
+	$(4)
+
+.PHONY: $(1)
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS) $$(CXX) $$(CXXFLAGS) $$(AR) $$(ARFLAGS) $(5))/$(1)
+	$$(LN) -sf $$< $$@
+endef # static_library
+
+
 define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix, compiler, flags
 ifeq ($$(V),2)
 $$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7)))
@@ -162,7 +180,7 @@ $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	$(4)
 
 .PHONY: $(1)
-$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS)$(5)$(2))/$(1)
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS)$(5))/$(1)
 	$$(LN) -sf $$< $$@$(EXT)
 endef # program_base
 # Note: $(EXT) must be set to .exe for Windows

@@ -46,7 +46,6 @@ DEBUGFLAGS+=-Wall -Wextra -Wconversion -Wcast-qual -Wcast-align -Wshadow \
 CFLAGS += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS   = $(CFLAGS) $(CPPFLAGS)
 XXHSUM_VERSION = $(LIBVER)
-UNAME := $(shell uname)
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -71,6 +70,7 @@ endif
 
 # OS X linker doesn't support -soname, and use different extension
 # see: https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html
+UNAME ?= $(shell uname)
 ifeq ($(UNAME), Darwin)
 	SHARED_EXT = dylib
 	SHARED_EXT_MAJOR = $(LIBVER_MAJOR).$(SHARED_EXT)
@@ -133,9 +133,8 @@ $(eval $(call c_program,xxhsum_inlinedXXH,$(CLI_OBJS)))
 
 # library
 
-libxxhash.a: ARFLAGS = rcs
-libxxhash.a: xxhash.o
-	$(AR) $(ARFLAGS) $@ $^
+libxxhash.a:
+$(eval $(call static_library,libxxhash.a,xxhash.o))
 
 $(LIBXXH): LDFLAGS += -shared
 ifeq (,$(filter Windows%,$(OS)))
@@ -149,13 +148,12 @@ $(LIBXXH): xxhash.c
 	$(LN) -sf $@ libxxhash.$(SHARED_EXT_MAJOR)
 	$(LN) -sf $@ libxxhash.$(SHARED_EXT)
 
-.PHONY: libxxhash
-libxxhash:  ## generate dynamic xxhash library
+.PHONY: libxxhash  ## generate dynamic xxhash library
 libxxhash: $(LIBXXH)
 
-.PHONY: lib
-lib:  ## generate static and dynamic xxhash libraries
+.PHONY: lib  ## generate static and dynamic xxhash libraries
 lib: libxxhash.a libxxhash
+
 
 # helper targets
 
