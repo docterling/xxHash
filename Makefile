@@ -87,8 +87,7 @@ LIBXXH = libxxhash.$(SHARED_EXT_VER)
 
 XXHSUM_SRC_DIR = cli
 XXHSUM_SRCS = $(wildcard $(XXHSUM_SRC_DIR)/*.c)
-XXHSUM_SRCS_FLAT = $(notdir $(XXHSUM_SRCS))
-XXHSUM_OBJS = $(XXHSUM_SRCS_FLAT:.c=.o)
+XXHSUM_OBJS = $(XXHSUM_SRCS:.c=.o)
 
 ## define default before including multiconf.make
 ## generate CLI and libraries in release mode (default for `make`)
@@ -96,7 +95,7 @@ XXHSUM_OBJS = $(XXHSUM_SRCS_FLAT:.c=.o)
 default: DEBUGFLAGS=
 default: lib xxhsum_and_links
 
-C_SRCDIRS = . $(XXHSUM_SRC_DIR) fuzz
+C_SRCDIRS = . cli fuzz
 include build/make/multiconf.make
 
 .PHONY: all
@@ -318,7 +317,7 @@ CC_VERSION := $(shell $(CC) --version 2>/dev/null)
 ifneq (,$(findstring clang,$(CC_VERSION)))
 fuzzer: CFLAGS += -fsanitize=fuzzer
 fuzzer: LDFLAGS += -L. -Wl,-Bstatic -lxxhash -Wl,-Bdynamic
-$(eval $(call c_program,fuzzer, fuzzer.o xxhash.o))
+$(eval $(call c_program,fuzzer, fuzz/fuzzer.o xxhash.o))
 else
 fuzzer: this_target_requires_clang # intentional fail
 endif

@@ -57,7 +57,7 @@ VERBOSE ?= $(V)
 $(VERBOSE).SILENT:
 
 # Directory where object files will be built
-CACHE_ROOT := cachedObjs
+CACHE_ROOT ?= cachedObjs
 
 # Dependency management
 DEPFLAGS = -MT $@ -MMD -MP -MF
@@ -162,7 +162,7 @@ $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	$(4)
 
 .PHONY: $(1)
-$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS)$(5))/$(1)
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS)$(5)$(2))/$(1)
 	$$(LN) -sf $$< $$@$(EXT)
 endef # program_base
 # Note: $(EXT) must be set to .exe for Windows
@@ -185,21 +185,20 @@ endef # cxx_program_shared_o
 
 
 # Create targets for individual object files
-
-C_SRCS ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
-ifneq ($(strip $(C_SRCDIRS)),)
+C_SRCDIRS += .
 vpath %.c $(C_SRCDIRS)
-endif
-CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
-ifneq ($(strip $(CXX_SRCDIRS)),)
+CXX_SRCDIRS += .
 vpath %.cpp $(CXX_SRCDIRS)
-endif
-ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
-ifneq ($(strip $(ASM_SRCDIRS)),)
+ASM_SRCDIRS += .
 vpath %.S $(ASM_SRCDIRS)
-endif
 
-C_OBJS  ?= $(patsubst %.c,%.o,$(C_SRCS))
+# If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
+C_SRCS   ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
+CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
+ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
+
+# If C_SRCS, CXX_SRCS and ASM_SRCS are not defined, use C_OBJS, CXX_OBJS and ASM_OBJS
+C_OBJS   ?= $(patsubst %.c,%.o,$(C_SRCS))
 CXX_OBJS ?= $(patsubst %.cpp,%.o,$(CXX_SRCS))
 ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
 
