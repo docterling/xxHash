@@ -156,13 +156,13 @@ $$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5)))
 endif
 
 ALL_PROGRAMS += $(1)
-$$(CACHE_ROOT)/%/$(1) : ARFLAGS ?= rcs
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo AR $$@
-	$(AR) $$(ARFLAGS) $$@ $$^
+	$$(AR) $$(ARFLAGS) $$@ $$^
 	$(4)
 
 .PHONY: $(1)
+$(1) : ARFLAGS = rcs
 $(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS) $$(CXX) $$(CXXFLAGS) $$(AR) $$(ARFLAGS) $(5))/$(1)
 	$$(LN) -sf $$< $$@
 endef # static_library
