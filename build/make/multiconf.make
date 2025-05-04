@@ -59,8 +59,7 @@ $(VERBOSE).SILENT:
 # Directory where object files will be built
 CACHE_ROOT ?= cachedObjs
 
-# Dependency management
-DEPFLAGS = -MT $@ -MMD -MP -MF
+# --------------------------------------------------------------------------------------------
 
 # Automatic determination of build artifacts cache directory, keyed on build
 # flags, so that we can do incremental, parallel builds of different binaries
@@ -84,20 +83,14 @@ else
   HASH_FUNC = $(firstword $(shell echo $(2) | $(HASH) ))
 endif
 
-# OSX linker doen't support --whole-archive and --no-whole-archive, so we are using -force_load and
-# -load_hidden instead
-ifeq ($(UNAME), Darwin)
-	WHOLE_ARCHIVE = -force_load
-	NO_WHOLE_ARCHIVE = -load_hidden
-else
-	WHOLE_ARCHIVE = --whole-archive
-	NO_WHOLE_ARCHIVE = --no-whole-archive
-endif
-
 
 MKDIR ?= mkdir
-RANLIB ?= ranlib
 LN ?= ln
+
+# --------------------------------------------------------------------------------------------
+
+# Dependency management
+DEPFLAGS = -MT $@ -MMD -MP -MF
 
 # Include dependency files
 include $(wildcard $(CACHE_ROOT)/**/*.d)
