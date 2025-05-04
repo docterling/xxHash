@@ -46,7 +46,6 @@ DEBUGFLAGS+=-Wall -Wextra -Wconversion -Wcast-qual -Wcast-align -Wshadow \
 CFLAGS += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS   = $(CFLAGS) $(CPPFLAGS)
 XXHSUM_VERSION = $(LIBVER)
-UNAME := $(shell uname)
 
 # Define *.exe as extension for Windows systems
 ifneq (,$(filter Windows%,$(OS)))
@@ -71,6 +70,7 @@ endif
 
 # OS X linker doesn't support -soname, and use different extension
 # see: https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html
+UNAME ?= $(shell uname)
 ifeq ($(UNAME), Darwin)
 	SHARED_EXT = dylib
 	SHARED_EXT_MAJOR = $(LIBVER_MAJOR).$(SHARED_EXT)
@@ -85,10 +85,9 @@ endif
 
 LIBXXH = libxxhash.$(SHARED_EXT_VER)
 
-XXHSUM_SRC_DIR = cli
-XXHSUM_SRCS = $(wildcard $(XXHSUM_SRC_DIR)/*.c)
-XXHSUM_SRCS_FLAT = $(notdir $(XXHSUM_SRCS))
-XXHSUM_OBJS = $(XXHSUM_SRCS_FLAT:.c=.o)
+CLI_DIR = cli
+CLI_SRCS = $(wildcard $(CLI_DIR)/*.c)
+CLI_OBJS = $(CLI_SRCS:.c=.o)
 
 ## define default before including multiconf.make
 ## generate CLI and libraries in release mode (default for `make`)
@@ -96,7 +95,7 @@ XXHSUM_OBJS = $(XXHSUM_SRCS_FLAT:.c=.o)
 default: DEBUGFLAGS=
 default: lib xxhsum_and_links
 
-C_SRCDIRS = . $(XXHSUM_SRC_DIR) fuzz
+C_SRCDIRS = . $(CLI_DIR) fuzz
 include build/make/multiconf.make
 
 .PHONY: all
@@ -107,7 +106,7 @@ ifeq ($(DISPATCH),1)
 xxhsum: CPPFLAGS += -DXXHSUM_DISPATCH=1
 XXHSUM_ADD_O = xxh_x86dispatch.o
 endif
-$(eval $(call c_program,xxhsum,xxhash.o $(XXHSUM_OBJS) $(XXHSUM_ADD_O)))
+$(eval $(call c_program,xxhsum,xxhash.o $(CLI_OBJS) $(XXHSUM_ADD_O)))
 
 .PHONY: xxhsum_and_links
 xxhsum_and_links: xxhsum xxh32sum xxh64sum xxh128sum xxh3sum
@@ -119,21 +118,24 @@ xxh32sum xxh64sum xxh128sum xxh3sum: xxhsum
 
 ## generate CLI in 32-bits mode
 xxhsum32: CFLAGS += -m32
-$(eval $(call c_program,xxhsum32,xxhash.o $(XXHSUM_OBJS)))
+ifeq ($(DISPATCH),1)
+xxhsum32: CPPFLAGS += -DXXHSUM_DISPATCH=1
+endif
+$(eval $(call c_program,xxhsum32,xxhash.o $(CLI_OBJS) $(XXHSUM_ADD_O)))
 
 ## Warning: dispatch only works for x86/x64 systems
 dispatch: CPPFLAGS += -DXXHSUM_DISPATCH=1
-$(eval $(call c_program,dispatch,xxhash.o xxh_x86dispatch.o $(XXHSUM_OBJS)))
+$(eval $(call c_program,dispatch,xxhash.o xxh_x86dispatch.o $(CLI_OBJS)))
 
 xxhsum_inlinedXXH: CPPFLAGS += -DXXH_INLINE_ALL
-$(eval $(call c_program,xxhsum_inlinedXXH,$(XXHSUM_OBJS)))
+$(eval $(call c_program,xxhsum_inlinedXXH,$(CLI_OBJS)))
 
 
+# =================================================
 # library
 
-libxxhash.a: ARFLAGS = rcs
-libxxhash.a: xxhash.o
-	$(AR) $(ARFLAGS) $@ $^
+libxxhash.a:
+$(eval $(call static_library,libxxhash.a,xxhash.o))
 
 $(LIBXXH): LDFLAGS += -shared
 ifeq (,$(filter Windows%,$(OS)))
@@ -144,16 +146,19 @@ $(LIBXXH): xxh_x86dispatch.c
 endif
 $(LIBXXH): xxhash.c
 	$(CC) $(FLAGS) $^ $(LDFLAGS) $(SONAME_FLAGS) -o $@
-	$(LN) -sf $@ libxxhash.$(SHARED_EXT_MAJOR)
-	$(LN) -sf $@ libxxhash.$(SHARED_EXT)
 
-.PHONY: libxxhash
-libxxhash:  ## generate dynamic xxhash library
-libxxhash: $(LIBXXH)
+libxxhash.$(SHARED_EXT_MAJOR): $(LIBXXH)
+	$(LN) -sf $< $@
 
-.PHONY: lib
-lib:  ## generate static and dynamic xxhash libraries
+libxxhash.$(SHARED_EXT): libxxhash.$(SHARED_EXT_MAJOR)
+	$(LN) -sf $< $@
+
+.PHONY: libxxhash  ## generate dynamic xxhash library
+libxxhash: $(LIBXXH) libxxhash.$(SHARED_EXT_MAJOR) libxxhash.$(SHARED_EXT)
+
+.PHONY: lib  ## generate static and dynamic xxhash libraries
 lib: libxxhash.a libxxhash
+
 
 # helper targets
 
@@ -173,11 +178,12 @@ help:  ## list documented targets
 	$(AWK) 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: clean
-clean: clean_cache
+clean:
 	$(RM) -r *.dSYM   # Mac OS-X specific
 	$(RM) core *.o *.obj *.$(SHARED_EXT) *.$(SHARED_EXT).* *.a libxxhash.pc
 	$(RM) xxhsum.wasm xxhsum.js xxhsum.html
 	$(RM) xxh32sum$(EXT) xxh64sum$(EXT) xxh128sum$(EXT) xxh3sum$(EXT)
+	$(RM) fuzzer
 	$(MAKE) -C tests clean
 	$(MAKE) -C tests/bench clean
 	$(MAKE) -C tests/collisions clean
@@ -317,8 +323,7 @@ test-xxhsum-c: xxhsum
 CC_VERSION := $(shell $(CC) --version 2>/dev/null)
 ifneq (,$(findstring clang,$(CC_VERSION)))
 fuzzer: CFLAGS += -fsanitize=fuzzer
-fuzzer: LDFLAGS += -L. -Wl,-Bstatic -lxxhash -Wl,-Bdynamic
-$(eval $(call c_program,fuzzer, fuzzer.o xxhash.o))
+$(eval $(call c_program,fuzzer, fuzz/fuzzer.o xxhash.o))
 else
 fuzzer: this_target_requires_clang # intentional fail
 endif
@@ -431,13 +436,13 @@ cppcheck:  ## check C source files using $(CPPCHECK) static analyzer
 namespaceTest:  ## ensure XXH_NAMESPACE redefines all public symbols
 	$(CC) -c xxhash.c
 	$(CC) -DXXH_NAMESPACE=TEST_ -c xxhash.c -o xxhash2.o
-	$(CC) xxhash.o xxhash2.o $(XXHSUM_SRCS)  -o xxhsum2  # will fail if one namespace missing (symbol collision)
+	$(CC) xxhash.o xxhash2.o $(CLI_SRCS)  -o xxhsum2  # will fail if one namespace missing (symbol collision)
 	$(RM) *.o xxhsum2  # clean
 
-MAN = $(XXHSUM_SRC_DIR)/xxhsum.1
+MAN = $(CLI_DIR)/xxhsum.1
 MD2ROFF ?= ronn
 MD2ROFF_FLAGS ?= --roff --warnings --manual="User Commands" --organization="xxhsum $(XXHSUM_VERSION)"
-$(MAN): $(XXHSUM_SRC_DIR)/xxhsum.1.md xxhash.h
+$(MAN): $(CLI_DIR)/xxhsum.1.md xxhash.h
 	cat $< | $(MD2ROFF) $(MD2ROFF_FLAGS) | $(SED) -n '/^\.\\\".*/!p' > $@
 
 .PHONY: man
@@ -618,7 +623,7 @@ install_libxxhash: libxxhash
 	$(MAKE_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_PROGRAM) $(LIBXXH) $(DESTDIR)$(LIBDIR)
 	ln -sf $(LIBXXH) $(DESTDIR)$(LIBDIR)/libxxhash.$(SHARED_EXT_MAJOR)
-	ln -sf $(LIBXXH) $(DESTDIR)$(LIBDIR)/libxxhash.$(SHARED_EXT)
+	ln -sf libxxhash.$(SHARED_EXT_MAJOR) $(DESTDIR)$(LIBDIR)/libxxhash.$(SHARED_EXT)
 
 install_libxxhash.includes:
 	$(INSTALL) -d -m 755 $(DESTDIR)$(INCLUDEDIR)   # includes
