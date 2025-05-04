@@ -85,9 +85,9 @@ endif
 
 LIBXXH = libxxhash.$(SHARED_EXT_VER)
 
-XXHSUM_SRC_DIR = cli
-XXHSUM_SRCS = $(wildcard $(XXHSUM_SRC_DIR)/*.c)
-XXHSUM_OBJS = $(XXHSUM_SRCS:.c=.o)
+CLI_DIR = cli
+CLI_SRCS = $(wildcard $(CLI_DIR)/*.c)
+CLI_OBJS = $(CLI_SRCS:.c=.o)
 
 ## define default before including multiconf.make
 ## generate CLI and libraries in release mode (default for `make`)
@@ -95,7 +95,7 @@ XXHSUM_OBJS = $(XXHSUM_SRCS:.c=.o)
 default: DEBUGFLAGS=
 default: lib xxhsum_and_links
 
-C_SRCDIRS = . cli fuzz
+C_SRCDIRS = . $(CLI_DIR) fuzz
 include build/make/multiconf.make
 
 .PHONY: all
@@ -106,7 +106,7 @@ ifeq ($(DISPATCH),1)
 xxhsum: CPPFLAGS += -DXXHSUM_DISPATCH=1
 XXHSUM_ADD_O = xxh_x86dispatch.o
 endif
-$(eval $(call c_program,xxhsum,xxhash.o $(XXHSUM_OBJS) $(XXHSUM_ADD_O)))
+$(eval $(call c_program,xxhsum,xxhash.o $(CLI_OBJS) $(XXHSUM_ADD_O)))
 
 .PHONY: xxhsum_and_links
 xxhsum_and_links: xxhsum xxh32sum xxh64sum xxh128sum xxh3sum
@@ -118,14 +118,17 @@ xxh32sum xxh64sum xxh128sum xxh3sum: xxhsum
 
 ## generate CLI in 32-bits mode
 xxhsum32: CFLAGS += -m32
-$(eval $(call c_program,xxhsum32,xxhash.o $(XXHSUM_OBJS)))
+ifeq ($(DISPATCH),1)
+xxhsum32: CPPFLAGS += -DXXHSUM_DISPATCH=1
+endif
+$(eval $(call c_program,xxhsum32,xxhash.o $(CLI_OBJS) $(XXHSUM_ADD_O)))
 
 ## Warning: dispatch only works for x86/x64 systems
 dispatch: CPPFLAGS += -DXXHSUM_DISPATCH=1
-$(eval $(call c_program,dispatch,xxhash.o xxh_x86dispatch.o $(XXHSUM_OBJS)))
+$(eval $(call c_program,dispatch,xxhash.o xxh_x86dispatch.o $(CLI_OBJS)))
 
 xxhsum_inlinedXXH: CPPFLAGS += -DXXH_INLINE_ALL
-$(eval $(call c_program,xxhsum_inlinedXXH,$(XXHSUM_OBJS)))
+$(eval $(call c_program,xxhsum_inlinedXXH,$(CLI_OBJS)))
 
 
 # library
@@ -430,13 +433,13 @@ cppcheck:  ## check C source files using $(CPPCHECK) static analyzer
 namespaceTest:  ## ensure XXH_NAMESPACE redefines all public symbols
 	$(CC) -c xxhash.c
 	$(CC) -DXXH_NAMESPACE=TEST_ -c xxhash.c -o xxhash2.o
-	$(CC) xxhash.o xxhash2.o $(XXHSUM_SRCS)  -o xxhsum2  # will fail if one namespace missing (symbol collision)
+	$(CC) xxhash.o xxhash2.o $(CLI_SRCS)  -o xxhsum2  # will fail if one namespace missing (symbol collision)
 	$(RM) *.o xxhsum2  # clean
 
-MAN = $(XXHSUM_SRC_DIR)/xxhsum.1
+MAN = $(CLI_DIR)/xxhsum.1
 MD2ROFF ?= ronn
 MD2ROFF_FLAGS ?= --roff --warnings --manual="User Commands" --organization="xxhsum $(XXHSUM_VERSION)"
-$(MAN): $(XXHSUM_SRC_DIR)/xxhsum.1.md xxhash.h
+$(MAN): $(CLI_DIR)/xxhsum.1.md xxhash.h
 	cat $< | $(MD2ROFF) $(MD2ROFF_FLAGS) | $(SED) -n '/^\.\\\".*/!p' > $@
 
 .PHONY: man
