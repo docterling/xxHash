@@ -50,8 +50,9 @@ collisionsTest: CFLAGS := -O3 $(CFLAGS)
 $(eval $(call cxx_program,collisionsTest,main.o pool.o threading.o sort.o $(HASH_OBJ)))
 
 .PHONY: debug
+debug: CPPFLAGS += -DDEBUG -DXXH_NO_INLINE_HINTS
 debug:
-	CFLAGS='$(CFLAGS) -g3 -Og -DDEBUG' CXXFLAGS='$(CXXFLAGS) -g3 -Og -DDEBUG' $(MAKE) collisionsTest
+	CFLAGS='$(CFLAGS) -g3 -Og' CXXFLAGS='$(CXXFLAGS) -g3 -Og' CPPFLAGS='$(CPPFLAGS)' $(MAKE) collisionsTest
 
 .PHONY: check
 check: test
