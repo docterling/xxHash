@@ -59,8 +59,7 @@ $(VERBOSE).SILENT:
 # Directory where object files will be built
 CACHE_ROOT ?= cachedObjs
 
-# Dependency management
-DEPFLAGS = -MT $@ -MMD -MP -MF
+# --------------------------------------------------------------------------------------------
 
 # Automatic determination of build artifacts cache directory, keyed on build
 # flags, so that we can do incremental, parallel builds of different binaries
@@ -84,20 +83,14 @@ else
   HASH_FUNC = $(firstword $(shell echo $(2) | $(HASH) ))
 endif
 
-# OSX linker doen't support --whole-archive and --no-whole-archive, so we are using -force_load and
-# -load_hidden instead
-ifeq ($(UNAME), Darwin)
-	WHOLE_ARCHIVE = -force_load
-	NO_WHOLE_ARCHIVE = -load_hidden
-else
-	WHOLE_ARCHIVE = --whole-archive
-	NO_WHOLE_ARCHIVE = --no-whole-archive
-endif
-
 
 MKDIR ?= mkdir
-RANLIB ?= ranlib
 LN ?= ln
+
+# --------------------------------------------------------------------------------------------
+
+# Dependency management
+DEPFLAGS = -MT $@ -MMD -MP -MF
 
 # Include dependency files
 include $(wildcard $(CACHE_ROOT)/**/*.d)
@@ -118,22 +111,8 @@ $(CACHE_ROOT)/%/. :
 	$(MKDIR) -p $@
 
 
-define addTargetCObject  # targetName, addlDeps
-ifeq ($$(V),2)
-$$(info $$(call $(0),$(1),$(2)))
-endif
-
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
-	@echo CC $$@
-	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
-
-endef # addTargetCObject
-
 define addTargetAsmObject  # targetName, addlDeps
-ifeq ($$(V),2)
-$$(info $$(call $(0),$(1),$(2)))
-endif
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
 $$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
@@ -142,13 +121,21 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
 
 endef # addTargetAsmObject
 
-define addTargetCxxObject  # targetName, addlDeps
-ifeq ($$(V),2)
-$$(info $$(call $(0),$(1),$(2)))
-endif
+define addTargetCObject  # targetName, addlDeps
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2)))) #debug print
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.cpp) $(2) | $$(CACHE_ROOT)/%/.
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
+	@echo CC $$@
+	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
+
+endef # addTargetCObject
+
+define addTargetCxxObject  # targetName, suffix, addlDeps
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3))))
+
+.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/.
 	@echo CXX $$@
 	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
@@ -159,21 +146,27 @@ C_SRCDIRS += .
 vpath %.c $(C_SRCDIRS)
 CXX_SRCDIRS += .
 vpath %.cpp $(CXX_SRCDIRS)
+vpath %.cc $(CXX_SRCDIRS)
 ASM_SRCDIRS += .
 vpath %.S $(ASM_SRCDIRS)
 
 # If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
 C_SRCS   ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
-CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
+CPP_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
+CC_SRCS  ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cc)))
+CXX_SRCS ?= $(CPP_SRCS) $(CC_SRCS)
 ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
 
 # If C_SRCS, CXX_SRCS and ASM_SRCS are not defined, use C_OBJS, CXX_OBJS and ASM_OBJS
 C_OBJS   ?= $(patsubst %.c,%.o,$(C_SRCS))
-CXX_OBJS ?= $(patsubst %.cpp,%.o,$(CXX_SRCS))
+CPP_OBJS ?= $(patsubst %.cpp,%.o,$(CPP_SRCS))
+CC_OBJS  ?= $(patsubst %.cc,%.o,$(CC_SRCS))
+CXX_OBJS ?= $(CPP_OBJS) $(CC_OBJS) # Note: not used
 ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
 
 $(foreach OBJ,$(C_OBJS),$(eval $(call addTargetCObject,$(OBJ))))
-$(foreach OBJ,$(CXX_OBJS),$(eval $(call addTargetCxxObject,$(OBJ))))
+$(foreach OBJ,$(CPP_OBJS),$(eval $(call addTargetCxxObject,$(OBJ),cpp)))
+$(foreach OBJ,$(CC_OBJS),$(eval $(call addTargetCxxObject,$(OBJ),cc)))
 $(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
 
 # --------------------------------------------------------------------------------------------
@@ -182,11 +175,9 @@ $(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
 
 define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
-ifeq ($$(V),2)
-$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5)))
-endif
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
+MCM_ALL_BINS += $(1)
 
-ALL_PROGRAMS += $(1)
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo AR $$@
 	$$(AR) $$(ARFLAGS) $$@ $$^
@@ -199,12 +190,25 @@ $(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS)
 endef # static_library
 
 
-define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix, compiler, flags
-ifeq ($$(V),2)
-$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7)))
-endif
+define c_dynamic_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
+MCM_ALL_BINS += $(1)
 
-ALL_PROGRAMS += $(1)
+$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
+	@echo LD $$@
+	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(LDFLAGS) -shared -o $$@ $$^ $$(LDLIBS)
+	$(4)
+
+.PHONY: $(1)
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS) $$(LDFLAGS) $$(LDLIBS) $(5))/$(1)
+	$$(LN) -sf $$< $$@
+endef # c_dynamic_library
+
+
+define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix, compiler, flags
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
+MCM_ALL_BINS += $(1)
+
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo LINK $$@
 	$$($(6)) $$(CPPFLAGS) $$($(7)) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
@@ -238,7 +242,7 @@ endef # cxx_program_shared_o
 .PHONY: clean_cache
 clean_cache:
 	$(RM) -rf $(CACHE_ROOT)
-	$(RM) $(ALL_PROGRAMS)
+	$(RM) $(MCM_ALL_BINS)
 
 # automatically attach to standard clean target
 .PHONY: clean

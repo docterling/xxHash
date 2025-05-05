@@ -47,6 +47,9 @@ $(eval $(call cxx_program,test, test.o cxxdeps/objcxx.o))
 
 lib.a:
 $(eval $(call static_library,lib.a, lib.o cdeps/obj.o))
+
+lib.so:
+$(eval $(call c_dynamic_library,lib.so, lib.o cdeps/obj.o))
 ```
 
 ### 4 · Build any config you like

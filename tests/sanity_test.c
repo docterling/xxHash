@@ -286,7 +286,7 @@ static XSUM_U64 SANITY_TEST_computeRandSeed(size_t step)
  * Technically, XXH3_64bits_update is identical to XXH3_128bits_update as of
  * v0.8.0, but we treat them as separate.
  */
-typedef XXH_errorcode (*SANITY_TEST_XXH3_update_t)(XXH3_state_t* state, const void* input, size_t length);
+typedef XXH_errorcode (*SANITY_TEST_XXH3_update_t)(XXH_NOESCAPE XXH3_state_t* state, XXH_NOESCAPE const void* input, size_t length);
 
 
 /* TODO : Share this function with xsum_sanity_check.c */
