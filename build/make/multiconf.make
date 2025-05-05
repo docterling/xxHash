@@ -111,16 +111,6 @@ $(CACHE_ROOT)/%/. :
 	$(MKDIR) -p $@
 
 
-define addTargetCObject  # targetName, addlDeps
-$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2)))) #debug print
-
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
-	@echo CC $$@
-	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
-
-endef # addTargetCObject
-
 define addTargetAsmObject  # targetName, addlDeps
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
 
@@ -131,25 +121,25 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
 
 endef # addTargetAsmObject
 
-define addTargetCppObject  # targetName, addlDeps
-$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
+define addTargetCObject  # targetName, addlDeps
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2)))) #debug print
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.cpp) $(2) | $$(CACHE_ROOT)/%/.
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
+	@echo CC $$@
+	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
+
+endef # addTargetCObject
+
+define addTargetCxxObject  # targetName, suffix, addlDeps
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3))))
+
+.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/.
 	@echo CXX $$@
 	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
-endef # addTargetCppObject
-
-define addTargetCcObject  # targetName, addlDeps
-$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
-
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.cc) $(2) | $$(CACHE_ROOT)/%/.
-	@echo CXX $$@
-	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
-
-endef # addTargetCcObject
+endef # addTargetCxxObject
 
 # Create targets for individual object files
 C_SRCDIRS += .
@@ -163,20 +153,20 @@ vpath %.S $(ASM_SRCDIRS)
 # If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
 C_SRCS   ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
 CPP_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
-CC_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cc)))
+CC_SRCS  ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cc)))
 CXX_SRCS ?= $(CPP_SRCS) $(CC_SRCS)
 ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
 
 # If C_SRCS, CXX_SRCS and ASM_SRCS are not defined, use C_OBJS, CXX_OBJS and ASM_OBJS
 C_OBJS   ?= $(patsubst %.c,%.o,$(C_SRCS))
 CPP_OBJS ?= $(patsubst %.cpp,%.o,$(CPP_SRCS))
-CC_OBJS ?= $(patsubst %.cc,%.o,$(CC_SRCS))
+CC_OBJS  ?= $(patsubst %.cc,%.o,$(CC_SRCS))
 CXX_OBJS ?= $(CPP_OBJS) $(CC_OBJS) # Note: not used
 ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
 
 $(foreach OBJ,$(C_OBJS),$(eval $(call addTargetCObject,$(OBJ))))
-$(foreach OBJ,$(CPP_OBJS),$(eval $(call addTargetCppObject,$(OBJ))))
-$(foreach OBJ,$(CC_OBJS),$(eval $(call addTargetCcObject,$(OBJ))))
+$(foreach OBJ,$(CPP_OBJS),$(eval $(call addTargetCxxObject,$(OBJ),cpp)))
+$(foreach OBJ,$(CC_OBJS),$(eval $(call addTargetCxxObject,$(OBJ),cc)))
 $(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
 
 # --------------------------------------------------------------------------------------------
@@ -186,7 +176,7 @@ $(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
 
 define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
-ALL_PROGRAMS += $(1)
+MCM_ALL_BINS += $(1)
 
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo AR $$@
@@ -202,7 +192,7 @@ endef # static_library
 
 define c_dynamic_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
-ALL_PROGRAMS += $(1)
+MCM_ALL_BINS += $(1)
 
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo LD $$@
@@ -217,8 +207,8 @@ endef # c_dynamic_library
 
 define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix, compiler, flags
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
+MCM_ALL_BINS += $(1)
 
-ALL_PROGRAMS += $(1)
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo LINK $$@
 	$$($(6)) $$(CPPFLAGS) $$($(7)) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
@@ -252,7 +242,7 @@ endef # cxx_program_shared_o
 .PHONY: clean_cache
 clean_cache:
 	$(RM) -rf $(CACHE_ROOT)
-	$(RM) $(ALL_PROGRAMS)
+	$(RM) $(MCM_ALL_BINS)
 
 # automatically attach to standard clean target
 .PHONY: clean
