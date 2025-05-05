@@ -36,27 +36,22 @@ HASH_SRC := $(wildcard allcodecs/*.c) $(wildcard allcodecs/*.cc) $(wildcard allc
 HASH_OBJ := $(addsuffix .o,$(basename $(HASH_SRC)))
 
 .PHONY: default
-default: release
+default: collisionsTest
 
 C_SRCDIRS = $(shell find allcodecs -type d)
 CXX_SRCDIRS = $(shell find allcodecs -type d)
 include ../../build/make/multiconf.make
 
 .PHONY: all
-all: release
+all: collisionsTest
 
-collisionsTest:
+collisionsTest: CXXFLAGS := -O3 $(CXXFLAGS)
+collisionsTest: CFLAGS := -O3 $(CFLAGS)
 $(eval $(call cxx_program,collisionsTest,main.o pool.o threading.o sort.o $(HASH_OBJ)))
 
-.PHONY: release
-release: CXXFLAGS += -O3
-release: CFLAGS += -O3
-release: collisionsTest
-
 .PHONY: debug
-debug: CXXFLAGS += -g3 -O0 -DDEBUG
-debug: CFLAGS += -g3 -O0 -DDEBUG
-debug: collisionsTest
+debug:
+	CFLAGS='$(CFLAGS) -g3 -Og -DDEBUG' CXXFLAGS='$(CXXFLAGS) -g3 -Og -DDEBUG' $(MAKE) collisionsTest
 
 .PHONY: check
 check: test
