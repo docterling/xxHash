@@ -20,10 +20,12 @@
 #
 # ##########################################################################
 
-# Provides c_program(_shared_o), cxx_program(_shared_o) and static_library macros
-# Provides V=1 / VERBOSE=1 support. V=2 is used for debugging purposes.
-# Provides target clean_cache: delete objects and binaries created with this script
+
+# Provides c_program(_shared_o) and cxx_program(_shared_o) target generation macros
+# Provides static_library and c_dynamic_library target generation macros
 # Support recompilation of only impacted units when an associated *.h is updated.
+# Provides V=1 / VERBOSE=1 support. V=2 is used for debugging purposes.
+# Complement target clean: delete objects and binaries created by this script
 
 # Requires:
 # - C_SRCDIRS, CXX_SRCDIRS, ASM_SRCDIRS defined
@@ -40,7 +42,7 @@
 
 # *_program*: generates a recipe for a target that will be built in a cache directory.
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
-# *_shared_o* variant is an optional optimization variant, that make it possible for multiple targets to share the same objects.
+# *_shared_o* variants are optional optimization variants, that share the same objects across multiple targets.
 # However, as a consequence, all these objects must have exactly the same list of flags,
 # which in practice means that there must be no target-level modification (like: target: CFLAGS += someFlag).
 # If unsure, only use the standard variants, c_program and cxx_program.
@@ -58,6 +60,15 @@ $(VERBOSE).SILENT:
 
 # Directory where object files will be built
 CACHE_ROOT ?= cachedObjs
+
+# --------------------------------------------------------------------------------------------
+
+# Dependency management
+DEPFLAGS = -MT $@ -MMD -MP -MF
+
+# Include dependency files
+include $(wildcard $(CACHE_ROOT)/**/*.d)
+include $(wildcard $(CACHE_ROOT)/generic/*/*.d)
 
 # --------------------------------------------------------------------------------------------
 
@@ -86,15 +97,6 @@ endif
 
 MKDIR ?= mkdir
 LN ?= ln
-
-# --------------------------------------------------------------------------------------------
-
-# Dependency management
-DEPFLAGS = -MT $@ -MMD -MP -MF
-
-# Include dependency files
-include $(wildcard $(CACHE_ROOT)/**/*.d)
-include $(wildcard $(CACHE_ROOT)/generic/*/*.d)
 
 # --------------------------------------------------------------------------------------------
 # The following macros are used to create object files in the cache directory.
@@ -174,7 +176,19 @@ $(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
 # Binaries are built in the cache directory, and then symlinked to the current directory.
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
 
-define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
+
+# static_library - Create build rules for a static library with caching
+# Parameters:
+#   1. libName       - Library name (becomes output file and phony target)
+#   2. objectDeps    - Object file dependencies (will be built in cache path)
+# The following parameters are all optional:
+#   3. extraDeps     - Additional dependencies (no cache path prefix)
+#   4. postBuildCmds - Extra commands to run after AR
+#   5. extraHash     - Additional key to compute the unique cache path
+# Example:
+#   $(call static_library,libmath.a,vector.o matrix.o,$(CONFIG_H),strip $@,$(VERSION))
+define static_library  # libName, objectDeps, extraDeps, postBuildCmds, extraHash
+
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
 MCM_ALL_BINS += $(1)
 
@@ -187,10 +201,22 @@ $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 $(1) : ARFLAGS = rcs
 $(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS) $$(CXX) $$(CXXFLAGS) $$(AR) $$(ARFLAGS) $(5))/$(1)
 	$$(LN) -sf $$< $$@
+
 endef # static_library
 
 
-define c_dynamic_library  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix
+# c_dynamic_library - Create build rules for a C dynamic/shared library with caching
+# Parameters:
+#   1. libName      - Library name (becomes output file and phony target)
+#   2. objectDeps   - Object file dependencies (will be built in cache path)
+# The following parameters are all optional:
+#   3. extraDeps    - Additional dependencies (no cache path prefix)
+#   4. postLinkCmds - Extra commands to run after linking
+#   5. extraHash    - Additional key to compute the unique cache path
+# Example:
+#   $(call c_dynamic_library,libmath.so,vector.o matrix.o,$(CONFIG_H),strip $@,$(VERSION))
+define c_dynamic_library  # libName, objectDeps, extraDeps, postLinkCmds, extraHash
+
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
 MCM_ALL_BINS += $(1)
 
@@ -200,45 +226,63 @@ $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	$(4)
 
 .PHONY: $(1)
+$(1) : CFLAGS += -fPIC
 $(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS) $$(LDFLAGS) $$(LDLIBS) $(5))/$(1)
 	$$(LN) -sf $$< $$@
+
 endef # c_dynamic_library
 
 
-define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix, compiler, flags
+# program_base - Create build rules for an executable program with caching
+# Parameters:
+#   1. progName      - Executable name (becomes output file and phony target)
+#   2. objectDeps    - Object file dependencies (will be prefixed with cache path)
+# Parameters 3 to 5 are optional:
+#   3. extraDeps     - Additional dependencies (without cache path prefix)
+#   4. postLinkCmds  - Extra commands to run after linking
+#   5. extraHash     - Additional data to include in cache path hash
+# Parameters 6 & 7 are compulsory:
+#   6. compiler      - Variable name of compiler to use (CC or CXX)
+#   7. compilerFlags - Variable name of compiler flags to use (CFLAGS or CXXFLAGS)
+# Example:
+#   $(call program_base,myapp,main.o utils.o,$(CONFIG_H),strip $@,$(VERSION),CC,CFLAGS)
+#   $(call program_base,mycppapp,main.o utils.o,$(CONFIG_H),strip $@,$(VERSION),CXX,CXXFLAGS)
+define program_base  # progName, objectDeps, extraDeps, postLinkCmds, extraHash, compiler, compilerFlags
+
 $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
 MCM_ALL_BINS += $(1)
 
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
-	@echo LINK $$@
+	@echo LD $$@
 	$$($(6)) $$(CPPFLAGS) $$($(7)) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
 	$(4)
 
 .PHONY: $(1)
-$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS)$(5))/$(1)
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS) $(5))/$(1)
 	$$(LN) -sf $$< $$@$(EXT)
+
 endef # program_base
 # Note: $(EXT) must be set to .exe for Windows
 
-define c_program  # targetName, targetDeps, addlDeps, addRecipe
-$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1),CC,CFLAGS))
+define c_program  # progName, objectDeps, extraDeps, postLinkCmds
+$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1)$(2),CC,CFLAGS))
 endef # c_program
 
-define c_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
+define c_program_shared_o  # progName, objectDeps, extraDeps, postLinkCmds
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CC,CFLAGS))
 endef # c_program_shared_o
 
-define cxx_program  # targetName, targetDeps, addlDeps, addRecipe
-$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1),CXX,CXXFLAGS))
+define cxx_program  # progName, objectDeps, extraDeps, postLinkCmds
+$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1)$(2),CXX,CXXFLAGS))
 endef # cxx_program
 
-define cxx_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
+define cxx_program_shared_o  # progName, objectDeps, extraDeps, postLinkCmds
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CXX,CXXFLAGS))
 endef # cxx_program_shared_o
 
 # --------------------------------------------------------------------------------------------
 
-# Cleaning: delete all objects and binaries created with this script
+# Cleaning: delete all objects and binaries created by this script
 .PHONY: clean_cache
 clean_cache:
 	$(RM) -rf $(CACHE_ROOT)
