@@ -151,10 +151,17 @@ test_script:
         
         Set-Location "Release"
         
-        # Run xxhsum benchmark and basic functionality test
-        .\xxhsum.exe -bi1
+        # Run xxhsum using cmd to avoid PowerShell treating stderr as error
+        # xxhsum writes version info to stderr, which is normal behavior
+        cmd /c "xxhsum.exe -bi1"
         
-        Write-Host "------- xxhsum testing completed -------"
+        # Check exit code and fail if xxhsum failed
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "xxhsum.exe failed with exit code $LASTEXITCODE"
+          exit 1
+        }
+        
+        Write-Host "------- xxhsum testing completed successfully -------"
       }
 
 # ==============================================================================
