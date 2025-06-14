@@ -12,35 +12,30 @@ clone_depth: 2
 
 environment:
   matrix:
-    # Visual Studio builds with xxhsum testing
+    # Visual Studio builds with xxhsum testing (builds both Debug and Release)
     - COMPILER: "visual"
       ARCH: "x64"
-      BUILD_TYPE: "Release"
       TEST_XXHSUM: "true"
       
     - COMPILER: "visual"
       ARCH: "Win32"
-      BUILD_TYPE: "Release"
       TEST_XXHSUM: "true"
       
     # Legacy Visual Studio 2013 build
     - COMPILER: "visual"
       ARCH: "Win32"
-      BUILD_TYPE: "Release"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2013"
       TEST_XXHSUM: "true"
       
-    # MSVC 2015 Win32 Debug build
+    # Legacy Visual Studio 2015 build
     - COMPILER: "visual"
       ARCH: "Win32"
-      BUILD_TYPE: "Debug"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2015"
       TEST_XXHSUM: "true"
       
     # ARM build (no testing - cannot run on x86/x64 CI)
     - COMPILER: "visual"
       ARCH: "ARM"
-      BUILD_TYPE: "Release"
       TEST_XXHSUM: "false"
 
 # ==============================================================================
@@ -129,11 +124,15 @@ build_script:
       if ($env:COMPILER -eq "visual") {
         Set-Location "build/cmake"
         
-        # Configure CMake
-        cmake . -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE -A $env:ARCH -DXXHASH_C_FLAGS="/WX"
+        # Configure CMake (we'll build both Debug and Release regardless of initial config)
+        cmake . -A $env:ARCH -DXXHASH_C_FLAGS="/WX"
         
-        # Build
-        cmake --build . --config $env:BUILD_TYPE
+        # Build both Debug and Release configurations for comprehensive testing
+        Write-Host "Building Debug configuration..."
+        cmake --build . --config Debug
+        
+        Write-Host "Building Release configuration..."  
+        cmake --build . --config Release
       }
 
 # ==============================================================================
