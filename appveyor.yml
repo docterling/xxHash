@@ -30,6 +30,13 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2013"
       TEST_XXHSUM: "true"
       
+    # MSVC 2015 Win32 Debug build
+    - COMPILER: "visual"
+      ARCH: "Win32"
+      BUILD_TYPE: "Debug"
+      APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2015"
+      TEST_XXHSUM: "true"
+      
     # ARM build (no testing - cannot run on x86/x64 CI)
     - COMPILER: "visual"
       ARCH: "ARM"
