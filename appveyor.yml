@@ -1,115 +1,166 @@
-#---------------------------------#
-#      general configuration      #
-#---------------------------------#
+# ==============================================================================
+#                            AppVeyor CI Configuration
+# ==============================================================================
+
 version: 1.0.{build}
 max_jobs: 2
-
-#---------------------------------#
-#    environment configuration    #
-#---------------------------------#
 clone_depth: 2
+
+# ==============================================================================
+#                              Build Matrix
+# ==============================================================================
+
 environment:
   matrix:
-  - COMPILER: "visual"
-    ARCH: "x64"
-    TEST_XXHSUM: "true"
-  - COMPILER: "visual"
-    ARCH: "Win32"
-    TEST_XXHSUM: "true"
-  - COMPILER: "visual"
-    ARCH: "Win32"
-    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2013
-    TEST_XXHSUM: "true"
-  - COMPILER: "visual"
-    ARCH: "ARM"
-# Below tests are now disabled due to redundancy.
-# Their equivalent already runs correctly on Github Actions.
-#  - COMPILER: "visual"
-#    ARCH: "x64"
-#    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
-#    TEST_XXHSUM: "true"
-#  - COMPILER: "visual"
-#    ARCH: "ARM64"
-#    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
-#    # note: ARM64 is not available with Visual Studio 14 2015, which is default for Appveyor
+    # Visual Studio builds with xxhsum testing
+    - COMPILER: "visual"
+      ARCH: "x64"
+      BUILD_TYPE: "Release"
+      TEST_XXHSUM: "true"
+      
+    - COMPILER: "visual"
+      ARCH: "Win32"
+      BUILD_TYPE: "Release"
+      TEST_XXHSUM: "true"
+      
+    # Legacy Visual Studio 2013 build
+    - COMPILER: "visual"
+      ARCH: "Win32"
+      BUILD_TYPE: "Release"
+      APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2013"
+      TEST_XXHSUM: "true"
+      
+    # ARM build (no testing - cannot run on x86/x64 CI)
+    - COMPILER: "visual"
+      ARCH: "ARM"
+      BUILD_TYPE: "Release"
+      TEST_XXHSUM: "false"
 
-# The following tests were also flacky on Appveyor, for various reasons.
-#  - COMPILER: "gcc"
-#    PLATFORM: "mingw64"
-#  - COMPILER: "gcc"
-#    PLATFORM: "mingw32"
-#  - COMPILER: "gcc"
-#    PLATFORM: "clang"
+# ==============================================================================
+# Disabled configurations (redundant with GitHub Actions)
+# ==============================================================================
+# Visual Studio 2017 builds:
+#   - COMPILER: "visual", ARCH: "x64", IMAGE: "Visual Studio 2017"
+#   - COMPILER: "visual", ARCH: "ARM64", IMAGE: "Visual Studio 2017"
+#
+# MinGW/Clang builds (unreliable on AppVeyor):
+#   - COMPILER: "gcc", PLATFORM: "mingw64"
+#   - COMPILER: "gcc", PLATFORM: "mingw32"  
+#   - COMPILER: "gcc", PLATFORM: "clang"
+
+# ==============================================================================
+#                              Installation
+# ==============================================================================
 
 install:
-  - ECHO Installing %COMPILER% %PLATFORM% %ARCH%
-  - MKDIR bin
-  - if [%COMPILER%]==[gcc] SET PATH_ORIGINAL=%PATH%
-  - if [%COMPILER%]==[gcc] (
-      SET "PATH_MINGW32=c:\MinGW\bin;c:\MinGW\usr\bin" &&
-      SET "PATH_MINGW64=c:\msys64\mingw64\bin;c:\msys64\usr\bin" &&
-      COPY C:\MinGW\bin\mingw32-make.exe C:\MinGW\bin\make.exe &&
-      COPY C:\MinGW\bin\gcc.exe C:\MinGW\bin\cc.exe
-    )
+  - echo "Installing %COMPILER% %PLATFORM% %ARCH%"
+  - mkdir bin
+  
+  # Setup MinGW environment (currently disabled)
+  - ps: |
+      if ($env:COMPILER -eq "gcc") {
+        $env:PATH_ORIGINAL = $env:PATH
+        $env:PATH_MINGW32 = "c:\MinGW\bin;c:\MinGW\usr\bin"
+        $env:PATH_MINGW64 = "c:\msys64\mingw64\bin;c:\msys64\usr\bin"
+        
+        # Create required symlinks
+        Copy-Item "C:\MinGW\bin\mingw32-make.exe" "C:\MinGW\bin\make.exe"
+        Copy-Item "C:\MinGW\bin\gcc.exe" "C:\MinGW\bin\cc.exe"
+      }
 
-#---------------------------------#
-#       build configuration       #
-#---------------------------------#
+# ==============================================================================
+#                              Build Scripts
+# ==============================================================================
+
 build_script:
-  - if [%PLATFORM%]==[mingw32] SET PATH=%PATH_MINGW32%;%PATH_ORIGINAL%
-  - if [%PLATFORM%]==[mingw64] SET PATH=%PATH_MINGW64%;%PATH_ORIGINAL%
-  - if [%PLATFORM%]==[clang]   SET PATH=%PATH_MINGW64%;%PATH_ORIGINAL%
-  - ECHO ***
-  - ECHO Building %COMPILER% %PLATFORM% %ARCH%
-  - ECHO ***
+  # Configure environment paths for MinGW builds
+  - ps: |
+      if ($env:COMPILER -eq "gcc") {
+        switch ($env:PLATFORM) {
+          "mingw32" { $env:PATH = "$env:PATH_MINGW32;$env:PATH_ORIGINAL" }
+          "mingw64" { $env:PATH = "$env:PATH_MINGW64;$env:PATH_ORIGINAL" }  
+          "clang"   { $env:PATH = "$env:PATH_MINGW64;$env:PATH_ORIGINAL" }
+        }
+      }
+  
+  - echo "========================================"
+  - echo "Building %COMPILER% %PLATFORM% %ARCH%"
+  - echo "========================================"
 
-  - if [%COMPILER%]==[gcc] (
-      if [%PLATFORM%]==[clang] (
-        clang -v
-      ) ELSE (
-        gcc -v
-      )
-    )
-  - if [%COMPILER%]==[gcc] (
-      echo ----- &&
-      make -v &&
-      echo ----- &&
-      if not [%PLATFORM%]==[clang] (
-        if [%PLATFORM%]==[mingw32] ( SET CPPFLAGS=-DPOOL_MT=0 ) &&
-        make -B clean test MOREFLAGS=-Werror
-      ) ELSE (
-        SET CXXFLAGS=--std=c++14 &&
-        make -B clean test CC=clang CXX=clang++ MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wno-pass-failed" NO_C90_TEST=true
-      ) &&
-      make -C tests/bench
-    )
-    # note 1: strict c90 tests with clang fail, due to (erroneous) presence on `inline` keyword in some included system file
-    # note 2: multi-threading code doesn't work with mingw32, disabled through POOL_MT=0
-    # note 3: clang requires C++14 to compile sort because its own code contains c++14-only code
+  # GCC/MinGW/Clang build process
+  - ps: |
+      if ($env:COMPILER -eq "gcc") {
+        # Display compiler version
+        if ($env:PLATFORM -eq "clang") {
+          clang -v
+        } else {
+          gcc -v
+        }
+        
+        Write-Host "-----"
+        make -v
+        Write-Host "-----"
+        
+        # Build and test
+        if ($env:PLATFORM -ne "clang") {
+          if ($env:PLATFORM -eq "mingw32") {
+            $env:CPPFLAGS = "-DPOOL_MT=0"  # Disable multi-threading for mingw32
+          }
+          make -B clean test MOREFLAGS=-Werror
+        } else {
+          # Clang-specific build
+          $env:CXXFLAGS = "--std=c++14"
+          make -B clean test CC=clang CXX=clang++ MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wno-pass-failed" NO_C90_TEST=true
+        }
+        
+        # Build benchmark
+        make -C tests/bench
+      }
 
-  - if [%COMPILER%]==[visual] (
-      cd build/cmake &&
-      cmake . -DCMAKE_BUILD_TYPE=Release -A %ARCH% -DXXHASH_C_FLAGS="/WX" &&
-      cmake --build . --config Release
-    )
+  # Visual Studio build process  
+  - ps: |
+      if ($env:COMPILER -eq "visual") {
+        Set-Location "build/cmake"
+        
+        # Configure CMake
+        cmake . -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE -A $env:ARCH -DXXHASH_C_FLAGS="/WX"
+        
+        # Build
+        cmake --build . --config $env:BUILD_TYPE
+      }
 
-#---------------------------------#
-#       tests configuration       #
-#---------------------------------#
+# ==============================================================================
+#                              Test Scripts  
+# ==============================================================================
+
 test_script:
-  # note: can only run x86 and x64 binaries on Appveyor
-  # note: if %COMPILER%==gcc, xxhsum was already tested within `make test`
-  - if [%TEST_XXHSUM%]==[true] (
-      ECHO ***  &&
-      ECHO Testing %COMPILER% %PLATFORM% %ARCH%  &&
-      ECHO ***  &&
-      cd Release &&
-      xxhsum.exe -bi1 &&
-      ECHO ------- xxhsum tested -------
-    )
+  # Test xxhsum binary (only for x86/x64 architectures that can run on CI)
+  # Note: GCC builds already run tests during the build phase via 'make test'
+  - ps: |
+      if ($env:TEST_XXHSUM -eq "true") {
+        Write-Host "========================================"
+        Write-Host "Testing $env:COMPILER $env:PLATFORM $env:ARCH"
+        Write-Host "========================================"
+        
+        Set-Location "Release"
+        
+        # Run xxhsum benchmark and basic functionality test
+        .\xxhsum.exe -bi1
+        
+        Write-Host "------- xxhsum testing completed -------"
+      }
 
+# ==============================================================================
+#                              Artifacts
+# ==============================================================================
+# Currently no artifacts are collected
+# Future: Consider collecting built binaries for distribution
 
-#---------------------------------#
-#      artifacts configuration    #
-#---------------------------------#
-# none yet
+# ==============================================================================
+#                              Build Notes
+# ==============================================================================
+# 1. Strict C90 tests with clang fail due to 'inline' keyword in system headers
+# 2. Multi-threading disabled for mingw32 via POOL_MT=0 due to compatibility issues  
+# 3. Clang requires C++14 standard for sort compilation due to internal dependencies
+# 4. ARM/ARM64 builds cannot be tested on x86/x64 CI infrastructure
+# 5. Some configurations disabled due to redundancy with GitHub Actions CI
