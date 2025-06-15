@@ -15,27 +15,32 @@ environment:
     # Visual Studio builds with xxhsum testing (builds both Debug and Release)
     - COMPILER: "visual"
       ARCH: "x64"
+      AVX2_ENABLED: "true"
       TEST_XXHSUM: "true"
       
     - COMPILER: "visual"
       ARCH: "Win32"
+      AVX2_ENABLED: "true"
       TEST_XXHSUM: "true"
       
     # Legacy Visual Studio 2013 build
     - COMPILER: "visual"
       ARCH: "Win32"
+      AVX2_ENABLED: "false"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2013"
       TEST_XXHSUM: "true"
       
     # Legacy Visual Studio 2015 build
     - COMPILER: "visual"
       ARCH: "Win32"
+      AVX2_ENABLED: "true"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2015"
       TEST_XXHSUM: "true"
       
     # ARM build (no testing - cannot run on x86/x64 CI)
     - COMPILER: "visual"
       ARCH: "ARM"
+      AVX2_ENABLED: "false"
       TEST_XXHSUM: "false"
 
 # ==============================================================================
@@ -130,6 +135,13 @@ build_script:
         # Build both Debug and Release configurations for comprehensive testing
         Write-Host "Building Debug configuration..."
         cmake --build . --config Debug
+        
+        # Build Debug with AVX2 if enabled
+        if ($env:AVX2_ENABLED -eq "true") {
+          Write-Host "Building Debug configuration with AVX2..."
+          cmake . -A $env:ARCH -DXXHASH_C_FLAGS="/WX /arch:AVX2"
+          cmake --build . --config Debug
+        }
         
         Write-Host "Building Release configuration..."  
         cmake --build . --config Release
