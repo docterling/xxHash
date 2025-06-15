@@ -12,29 +12,25 @@ clone_depth: 2
 
 environment:
   matrix:
-    # Visual Studio builds with xxhsum testing (builds both Debug and Release)
-    - COMPILER: "visual"
-      ARCH: "x64"
-      AVX2_ENABLED: "true"
-      TEST_XXHSUM: "true"
-      
-    - COMPILER: "visual"
-      ARCH: "Win32"
-      AVX2_ENABLED: "true"
-      TEST_XXHSUM: "true"
-      
-    # Legacy Visual Studio 2013 build
+    # Legacy Visual Studio 2013 build (not supported by GitHub Actions)
     - COMPILER: "visual"
       ARCH: "Win32"
       AVX2_ENABLED: "false"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2013"
       TEST_XXHSUM: "true"
       
-    # Legacy Visual Studio 2015 build
+    # Legacy Visual Studio 2015 build (not supported by GitHub Actions)
     - COMPILER: "visual"
       ARCH: "Win32"
       AVX2_ENABLED: "true"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2015"
+      TEST_XXHSUM: "true"
+      
+    # Visual Studio 2017 build (not supported by GitHub Actions)
+    - COMPILER: "visual"
+      ARCH: "Win32"
+      AVX2_ENABLED: "true"
+      APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2017"
       TEST_XXHSUM: "true"
       
     # ARM build (no testing - cannot run on x86/x64 CI)
