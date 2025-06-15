@@ -14,28 +14,28 @@ environment:
   matrix:
     # Legacy Visual Studio 2013 build (not supported by GitHub Actions)
     - COMPILER: "visual"
-      ARCH: "Win32"
+      ARCHITECTURES: "Win32,x64"
       AVX2_ENABLED: "false"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2013"
       TEST_XXHSUM: "true"
       
     # Legacy Visual Studio 2015 build (not supported by GitHub Actions)
     - COMPILER: "visual"
-      ARCH: "Win32"
+      ARCHITECTURES: "Win32,x64"
       AVX2_ENABLED: "true"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2015"
       TEST_XXHSUM: "true"
       
-    # Visual Studio 2017 build (not supported by GitHub Actions)
+    # Visual Studio 2017 build (not supported by GitHub Actions) - both Win32 and x64
     - COMPILER: "visual"
-      ARCH: "Win32"
+      ARCHITECTURES: "Win32,x64"
       AVX2_ENABLED: "true"
       APPVEYOR_BUILD_WORKER_IMAGE: "Visual Studio 2017"
       TEST_XXHSUM: "true"
       
     # ARM build (no testing - cannot run on x86/x64 CI)
     - COMPILER: "visual"
-      ARCH: "ARM"
+      ARCHITECTURES: "ARM"
       AVX2_ENABLED: "false"
       TEST_XXHSUM: "false"
 
@@ -125,22 +125,41 @@ build_script:
       if ($env:COMPILER -eq "visual") {
         Set-Location "build/cmake"
         
-        # Configure CMake (we'll build both Debug and Release regardless of initial config)
-        cmake . -A $env:ARCH -DXXHASH_C_FLAGS="/WX"
+        # Split architectures and build each one
+        $architectures = $env:ARCHITECTURES -split ","
         
-        # Build both Debug and Release configurations for comprehensive testing
-        Write-Host "Building Debug configuration..."
-        cmake --build . --config Debug
-        
-        # Build Debug with AVX2 if enabled
-        if ($env:AVX2_ENABLED -eq "true") {
-          Write-Host "Building Debug configuration with AVX2..."
-          cmake . -A $env:ARCH -DXXHASH_C_FLAGS="/WX /arch:AVX2"
+        foreach ($arch in $architectures) {
+          $arch = $arch.Trim()
+          Write-Host "========================================"
+          Write-Host "Building for architecture: $arch"
+          Write-Host "========================================"
+          
+          # Create architecture-specific build directory
+          $buildDir = "build_$arch"
+          New-Item -Path $buildDir -ItemType Directory -Force | Out-Null
+          Set-Location $buildDir
+          
+          # Configure CMake for this architecture
+          cmake .. -A $arch -DXXHASH_C_FLAGS="/WX"
+          
+          # Build Debug configuration
+          Write-Host "Building Debug configuration for $arch..."
           cmake --build . --config Debug
+          
+          # Build Debug with AVX2 if enabled and supported
+          if ($env:AVX2_ENABLED -eq "true" -and $arch -ne "ARM") {
+            Write-Host "Building Debug configuration with AVX2 for $arch..."
+            cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:AVX2"
+            cmake --build . --config Debug
+          }
+          
+          # Build Release configuration
+          Write-Host "Building Release configuration for $arch..."
+          cmake --build . --config Release
+          
+          # Go back to cmake directory for next architecture
+          Set-Location ..
         }
-        
-        Write-Host "Building Release configuration..."  
-        cmake --build . --config Release
       }
 
 # ==============================================================================
@@ -152,23 +171,41 @@ test_script:
   # Note: GCC builds already run tests during the build phase via 'make test'
   - ps: |
       if ($env:TEST_XXHSUM -eq "true") {
-        Write-Host "========================================"
-        Write-Host "Testing $env:COMPILER $env:PLATFORM $env:ARCH"
-        Write-Host "========================================"
+        Set-Location "build/cmake"
         
-        Set-Location "Release"
+        # Split architectures and test each one
+        $architectures = $env:ARCHITECTURES -split ","
         
-        # Run xxhsum using cmd to avoid PowerShell treating stderr as error
-        # xxhsum writes version info to stderr, which is normal behavior
-        cmd /c "xxhsum.exe -bi1"
-        
-        # Check exit code and fail if xxhsum failed
-        if ($LASTEXITCODE -ne 0) {
-          Write-Host "xxhsum.exe failed with exit code $LASTEXITCODE"
-          exit 1
+        foreach ($arch in $architectures) {
+          $arch = $arch.Trim()
+          
+          # Only test architectures that can run on CI (x86/x64)
+          if ($arch -eq "ARM") {
+            Write-Host "Skipping testing for $arch (cannot run on x86/x64 CI)"
+            continue
+          }
+          
+          Write-Host "========================================"
+          Write-Host "Testing $env:COMPILER $arch"
+          Write-Host "========================================"
+          
+          Set-Location "build_$arch"
+          
+          # Test Release configuration only
+          Write-Host "Testing Release binary for $arch..."
+          Set-Location "Release"
+          cmd /c "xxhsum.exe -bi1"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Release xxhsum.exe failed for $arch with exit code $LASTEXITCODE"
+            exit 1
+          }
+          Write-Host "Release binary test completed successfully for $arch"
+          
+          # Go back to cmake directory for next architecture
+          Set-Location "../.."
         }
         
-        Write-Host "------- xxhsum testing completed successfully -------"
+        Write-Host "------- All xxhsum testing completed successfully -------"
       }
 
 # ==============================================================================
