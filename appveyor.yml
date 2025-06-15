@@ -126,7 +126,7 @@ test_script:
           # Test Release configuration only
           Write-Host "Testing Release binary for $arch..."
           Set-Location "Release"
-          cmd /c "xxhsum.exe -bi1"
+          cmd /c "xxhsum.exe -b99i0"
           if ($LASTEXITCODE -ne 0) {
             Write-Host "Release xxhsum.exe failed for $arch with exit code $LASTEXITCODE"
             exit 1
