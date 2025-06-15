@@ -40,126 +40,52 @@ environment:
       TEST_XXHSUM: "false"
 
 # ==============================================================================
-# Disabled configurations (redundant with GitHub Actions)
-# ==============================================================================
-# Visual Studio 2017 builds:
-#   - COMPILER: "visual", ARCH: "x64", IMAGE: "Visual Studio 2017"
-#   - COMPILER: "visual", ARCH: "ARM64", IMAGE: "Visual Studio 2017"
-#
-# MinGW/Clang builds (unreliable on AppVeyor):
-#   - COMPILER: "gcc", PLATFORM: "mingw64"
-#   - COMPILER: "gcc", PLATFORM: "mingw32"  
-#   - COMPILER: "gcc", PLATFORM: "clang"
-
-# ==============================================================================
-#                              Installation
-# ==============================================================================
-
-install:
-  - echo "Installing %COMPILER% %PLATFORM% %ARCH%"
-  - mkdir bin
-  
-  # Setup MinGW environment (currently disabled)
-  - ps: |
-      if ($env:COMPILER -eq "gcc") {
-        $env:PATH_ORIGINAL = $env:PATH
-        $env:PATH_MINGW32 = "c:\MinGW\bin;c:\MinGW\usr\bin"
-        $env:PATH_MINGW64 = "c:\msys64\mingw64\bin;c:\msys64\usr\bin"
-        
-        # Create required symlinks
-        Copy-Item "C:\MinGW\bin\mingw32-make.exe" "C:\MinGW\bin\make.exe"
-        Copy-Item "C:\MinGW\bin\gcc.exe" "C:\MinGW\bin\cc.exe"
-      }
-
-# ==============================================================================
 #                              Build Scripts
 # ==============================================================================
 
 build_script:
-  # Configure environment paths for MinGW builds
-  - ps: |
-      if ($env:COMPILER -eq "gcc") {
-        switch ($env:PLATFORM) {
-          "mingw32" { $env:PATH = "$env:PATH_MINGW32;$env:PATH_ORIGINAL" }
-          "mingw64" { $env:PATH = "$env:PATH_MINGW64;$env:PATH_ORIGINAL" }  
-          "clang"   { $env:PATH = "$env:PATH_MINGW64;$env:PATH_ORIGINAL" }
-        }
-      }
-  
   - echo "========================================"
-  - echo "Building %COMPILER% %PLATFORM% %ARCH%"
+  - echo "Building Visual Studio configurations"
   - echo "========================================"
-
-  # GCC/MinGW/Clang build process
-  - ps: |
-      if ($env:COMPILER -eq "gcc") {
-        # Display compiler version
-        if ($env:PLATFORM -eq "clang") {
-          clang -v
-        } else {
-          gcc -v
-        }
-        
-        Write-Host "-----"
-        make -v
-        Write-Host "-----"
-        
-        # Build and test
-        if ($env:PLATFORM -ne "clang") {
-          if ($env:PLATFORM -eq "mingw32") {
-            $env:CPPFLAGS = "-DPOOL_MT=0"  # Disable multi-threading for mingw32
-          }
-          make -B clean test MOREFLAGS=-Werror
-        } else {
-          # Clang-specific build
-          $env:CXXFLAGS = "--std=c++14"
-          make -B clean test CC=clang CXX=clang++ MOREFLAGS="--target=x86_64-w64-mingw32 -Werror -Wno-pass-failed" NO_C90_TEST=true
-        }
-        
-        # Build benchmark
-        make -C tests/bench
-      }
 
   # Visual Studio build process  
   - ps: |
-      if ($env:COMPILER -eq "visual") {
-        Set-Location "build/cmake"
+      Set-Location "build/cmake"
+      
+      # Split architectures and build each one
+      $architectures = $env:ARCHITECTURES -split ","
+      
+      foreach ($arch in $architectures) {
+        $arch = $arch.Trim()
+        Write-Host "========================================"
+        Write-Host "Building for architecture: $arch"
+        Write-Host "========================================"
         
-        # Split architectures and build each one
-        $architectures = $env:ARCHITECTURES -split ","
+        # Create architecture-specific build directory
+        $buildDir = "build_$arch"
+        New-Item -Path $buildDir -ItemType Directory -Force | Out-Null
+        Set-Location $buildDir
         
-        foreach ($arch in $architectures) {
-          $arch = $arch.Trim()
-          Write-Host "========================================"
-          Write-Host "Building for architecture: $arch"
-          Write-Host "========================================"
-          
-          # Create architecture-specific build directory
-          $buildDir = "build_$arch"
-          New-Item -Path $buildDir -ItemType Directory -Force | Out-Null
-          Set-Location $buildDir
-          
-          # Configure CMake for this architecture
-          cmake .. -A $arch -DXXHASH_C_FLAGS="/WX"
-          
-          # Build Debug configuration
-          Write-Host "Building Debug configuration for $arch..."
+        # Configure CMake for this architecture
+        cmake .. -A $arch -DXXHASH_C_FLAGS="/WX"
+        
+        # Build Debug configuration
+        Write-Host "Building Debug configuration for $arch..."
+        cmake --build . --config Debug
+        
+        # Build Debug with AVX2 if enabled and supported
+        if ($env:AVX2_ENABLED -eq "true" -and $arch -ne "ARM") {
+          Write-Host "Building Debug configuration with AVX2 for $arch..."
+          cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:AVX2"
           cmake --build . --config Debug
-          
-          # Build Debug with AVX2 if enabled and supported
-          if ($env:AVX2_ENABLED -eq "true" -and $arch -ne "ARM") {
-            Write-Host "Building Debug configuration with AVX2 for $arch..."
-            cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:AVX2"
-            cmake --build . --config Debug
-          }
-          
-          # Build Release configuration
-          Write-Host "Building Release configuration for $arch..."
-          cmake --build . --config Release
-          
-          # Go back to cmake directory for next architecture
-          Set-Location ..
         }
+        
+        # Build Release configuration
+        Write-Host "Building Release configuration for $arch..."
+        cmake --build . --config Release
+        
+        # Go back to cmake directory for next architecture
+        Set-Location ..
       }
 
 # ==============================================================================
@@ -167,8 +93,7 @@ build_script:
 # ==============================================================================
 
 test_script:
-  # Test xxhsum binary (only for x86/x64 architectures that can run on CI)
-  # Note: GCC builds already run tests during the build phase via 'make test'
+  # Test xxhsum Release binaries (only for x86/x64 architectures that can run on CI)
   - ps: |
       if ($env:TEST_XXHSUM -eq "true") {
         Set-Location "build/cmake"
@@ -186,7 +111,7 @@ test_script:
           }
           
           Write-Host "========================================"
-          Write-Host "Testing $env:COMPILER $arch"
+          Write-Host "Testing Visual Studio $arch"
           Write-Host "========================================"
           
           Set-Location "build_$arch"
@@ -217,8 +142,6 @@ test_script:
 # ==============================================================================
 #                              Build Notes
 # ==============================================================================
-# 1. Strict C90 tests with clang fail due to 'inline' keyword in system headers
-# 2. Multi-threading disabled for mingw32 via POOL_MT=0 due to compatibility issues  
-# 3. Clang requires C++14 standard for sort compilation due to internal dependencies
-# 4. ARM/ARM64 builds cannot be tested on x86/x64 CI infrastructure
-# 5. Some configurations disabled due to redundancy with GitHub Actions CI
+# 1. ARM/ARM64 builds cannot be tested on x86/x64 CI infrastructure
+# 2. AppVeyor focuses on legacy Visual Studio versions (2013, 2015, 2017)
+# 3. Modern Visual Studio versions (2019, 2022) are tested on GitHub Actions
