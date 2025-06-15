@@ -73,6 +73,13 @@ build_script:
         Write-Host "Building Debug configuration for $arch..."
         cmake --build . --config Debug
         
+        # Build Debug with SSE2 if supported
+        if ($arch -ne "ARM") {
+          Write-Host "Building Debug configuration with SSE2 for $arch..."
+          cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:SSE2"
+          cmake --build . --config Debug
+        }
+
         # Build Debug with AVX2 if enabled and supported
         if ($env:AVX2_ENABLED -eq "true" -and $arch -ne "ARM") {
           Write-Host "Building Debug configuration with AVX2 for $arch..."
