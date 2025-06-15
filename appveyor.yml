@@ -73,8 +73,8 @@ build_script:
         Write-Host "Building Debug configuration for $arch..."
         cmake --build . --config Debug
         
-        # Build Debug with SSE2 if supported (also fast compilation)
-        if ($arch -ne "ARM") {
+        # Build Debug with SSE2 if Win32 (x64 has SSE2 by default, ARM doesn't support it)
+        if ($arch -eq "Win32") {
           Write-Host "Building Debug configuration with SSE2 for $arch..."
           cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:SSE2" -DCMAKE_C_FLAGS_DEBUG="/Od /Zi /MDd"
           cmake --build . --config Debug
