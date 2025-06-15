@@ -66,17 +66,17 @@ build_script:
         New-Item -Path $buildDir -ItemType Directory -Force | Out-Null
         Set-Location $buildDir
         
-        # Configure CMake for this architecture
-        cmake .. -A $arch -DXXHASH_C_FLAGS="/WX"
+        # Configure CMake for this architecture with fast Debug builds
+        cmake .. -A $arch -DXXHASH_C_FLAGS="/WX" -DCMAKE_C_FLAGS_DEBUG="/Od /Zi /MDd"
         
-        # Build Debug configuration
+        # Build Debug configuration (fast compilation, no optimizations)
         Write-Host "Building Debug configuration for $arch..."
         cmake --build . --config Debug
         
-        # Build Debug with SSE2 if supported
+        # Build Debug with SSE2 if supported (also fast compilation)
         if ($arch -ne "ARM") {
           Write-Host "Building Debug configuration with SSE2 for $arch..."
-          cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:SSE2"
+          cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:SSE2" -DCMAKE_C_FLAGS_DEBUG="/Od /Zi /MDd"
           cmake --build . --config Debug
         }
 
