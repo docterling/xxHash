@@ -67,7 +67,7 @@ build_script:
         Set-Location $buildDir
         
         # Configure CMake for this architecture with fast Debug builds
-        cmake .. -A $arch -DXXHASH_C_FLAGS="/WX" -DCMAKE_C_FLAGS_DEBUG="/Od /Zi /MDd"
+        cmake .. -A $arch -DXXHASH_C_FLAGS="/W4 /WX" -DCMAKE_C_FLAGS_DEBUG="/Od /Zi /MDd"
         
         # Build Debug configuration (fast compilation, no optimizations)
         Write-Host "Building Debug configuration for $arch..."
@@ -76,14 +76,14 @@ build_script:
         # Build Debug with SSE2 if Win32 (x64 has SSE2 by default, ARM doesn't support it)
         if ($arch -eq "Win32") {
           Write-Host "Building Debug configuration with SSE2 for $arch..."
-          cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:SSE2" -DCMAKE_C_FLAGS_DEBUG="/Od /Zi /MDd"
+          cmake .. -A $arch -DXXHASH_C_FLAGS="/W4 /WX /arch:SSE2" -DCMAKE_C_FLAGS_DEBUG="/Od /Zi /MDd"
           cmake --build . --config Debug
         }
 
         # Build Debug with AVX2 if enabled and supported
         if ($env:AVX2_ENABLED -eq "true" -and $arch -ne "ARM") {
           Write-Host "Building Debug configuration with AVX2 for $arch..."
-          cmake .. -A $arch -DXXHASH_C_FLAGS="/WX /arch:AVX2"
+          cmake .. -A $arch -DXXHASH_C_FLAGS="/W4 /WX /arch:AVX2" -DCMAKE_C_FLAGS_DEBUG="/Od /Zi /MDd"
           cmake --build . --config Debug
         }
         
