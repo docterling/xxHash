@@ -37,15 +37,11 @@
 #   elapsed time.
 #
 # Todos:
-# - [ ] Linux: Add native ARM runner.
 # - [ ] Linux: Add native ARM64 runner.
 # - [ ] Linux: Add native PPC64LE runner.
 # - [ ] Linux: Add native S390X runner.
-# - [ ] Windows: Add VS2013.
-# - [ ] Windows: Add VS2015.
 # - [ ] Windows: Add clang for msys2.
-# - [ ] Windows: Add native or emulated ARM runner.
-# - [ ] Windows: Add native or emulated ARM64 runner.
+# - [ ] Windows: Add native or emulated ARM64 runner (note: currently unreliable)
 
 
 # Name of the workflow is also displayed as a SVG badge
@@ -166,6 +162,11 @@ jobs:
       if: always()
       run: |
         make clean test-all
+
+    - name: test-alias
+      run: |
+        make clean
+        make -C tests test_alias
 
 
   ubuntu-consistency:
