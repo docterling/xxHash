@@ -6715,6 +6715,16 @@ XXH3_update(XXH3_state_t* XXH_RESTRICT const state,
     }
 
     XXH_ASSERT(state != NULL);
+    state->totalLen += len;
+
+    /* small input : just fill in tmp buffer */
+    XXH_ASSERT(state->bufferedSize <= XXH3_INTERNALBUFFER_SIZE);
+    if (len <= XXH3_INTERNALBUFFER_SIZE - state->bufferedSize) {
+        XXH_memcpy(state->buffer + state->bufferedSize, input, len);
+        state->bufferedSize += (XXH32_hash_t)len;
+        return XXH_OK;
+    }
+
     {   const xxh_u8* const bEnd = input + len;
         const unsigned char* const secret = (state->extSecret == NULL) ? state->customSecret : state->extSecret;
 #if defined(XXH3_STREAM_USE_STACK) && XXH3_STREAM_USE_STACK >= 1
@@ -6727,15 +6737,6 @@ XXH3_update(XXH3_state_t* XXH_RESTRICT const state,
 #else
         xxh_u64* XXH_RESTRICT const acc = state->acc;
 #endif
-        state->totalLen += len;
-        XXH_ASSERT(state->bufferedSize <= XXH3_INTERNALBUFFER_SIZE);
-
-        /* small input : just fill in tmp buffer */
-        if (len <= XXH3_INTERNALBUFFER_SIZE - state->bufferedSize) {
-            XXH_memcpy(state->buffer + state->bufferedSize, input, len);
-            state->bufferedSize += (XXH32_hash_t)len;
-            return XXH_OK;
-        }
 
         /* total input is now > XXH3_INTERNALBUFFER_SIZE */
         #define XXH3_INTERNALBUFFER_STRIPES (XXH3_INTERNALBUFFER_SIZE / XXH_STRIPE_LEN)
