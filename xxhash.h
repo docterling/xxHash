@@ -5953,7 +5953,7 @@ XXH3_initCustomSecret_rvv(void* XXH_RESTRICT customSecret, xxh_u64 seed64)
                                     seed64, (uint64_t)(-(int64_t)seed64), \
                                     seed64, (uint64_t)(-(int64_t)seed64)};
             // Cast the default secret to a signed 64-bit pointer for vectorized access
-            const int64_t* const xXXH3_kSecret = (const int64_t*)XXH3_kSecret;
+            const int64_t* const xXXH3_kSecret = (const int64_t*)((const void*)XXH3_kSecret);
             size_t vl = 0;
             for (size_t i=0; i < XXH3_kSecret_64b_len; i += vl) {
 
