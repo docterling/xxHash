@@ -474,10 +474,16 @@ jobs:
         CPPFLAGS="-DXXH_VECTOR=XXH_SCALAR" LDFLAGS="-static" CC=$XCC RUN_ENV=$XEMU make clean check
         CPPFLAGS=-DXXH_VECTOR=XXH_VSX CFLAGS="-O3 -march=arch11 -mzvector" LDFLAGS="-static" CC=$XCC RUN_ENV=$XEMU make clean check
 
-    - name: MIPS-M68K-RISCV-SPARC (XXH_VECTOR=[ scalar ])
-      if: ${{ startsWith(matrix.name, 'MIPS') || startsWith(matrix.name, 'M68K') || startsWith(matrix.name, 'RISC-V') || startsWith(matrix.name, 'SPARC') }}
+    - name: MIPS-M68K-SPARC (XXH_VECTOR=[ scalar ])
+      if: ${{ startsWith(matrix.name, 'MIPS') || startsWith(matrix.name, 'M68K') || startsWith(matrix.name, 'SPARC') }}
       run: |
         make clean; LDFLAGS="-static" CC=$XCC RUN_ENV=$XEMU make check
+
+    - name: RISCV (XXH_VECTOR=[scalar, rvv])
+      if: ${{startsWith(matrix.name, 'RISC-V')}}
+      run: |
+        make clean; LDFLAGS="-static" CC=$XCC RUN_ENV=$XEMU make check
+        CPPFLAGS="-march=rv64gcv -O2 -DXXH_VECTOR=XXH_RVV" LDFLAGS="-static" CC=$XCC RUN_ENV=$XEMU make clean check
 
     - name: LoongArch (XXH_VECTOR=[ scalar, LSX ])
       if: ${{ startsWith(matrix.name, 'LoongArch') }}
