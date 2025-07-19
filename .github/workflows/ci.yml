@@ -538,7 +538,6 @@ jobs:
       matrix:
         system: [
           { os: windows-2022, vc: "VC++ 2022", clangcl: 'true', },
-          { os: windows-2019, vc: "VC++ 2019", clangcl: 'true', },
         ]
         arch: [ x64, Win32, ARM64 ]
     # make every PowerShell step start with `$ErrorActionPreference = 'Stop'`
