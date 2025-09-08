@@ -7,6 +7,15 @@
 
 cmake_minimum_required (VERSION 3.10 FATAL_ERROR)
 
+# This CMakeLists.txt is in a nested directory, which makes relative paths
+# (e.g. ../..) show up in include flags and logs.
+#
+# To keep build output readable, we resolve these relative paths into
+# absolute, cleaner ones. For example:
+#   /path/xxHash/build/cmake/../..   ->   /path/xxHash
+#
+# We use get_filename_component() twice to step up two levels and store
+# the result in XXHASH_DIR.
 get_filename_component(XXHASH_DIR "${CMAKE_CURRENT_SOURCE_DIR}" DIRECTORY)
 get_filename_component(XXHASH_DIR "${XXHASH_DIR}" DIRECTORY)
 
