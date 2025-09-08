@@ -14,10 +14,8 @@ cmake_minimum_required (VERSION 3.10 FATAL_ERROR)
 # absolute, cleaner ones. For example:
 #   /path/xxHash/build/cmake/../..   ->   /path/xxHash
 #
-# We use get_filename_component() twice to step up two levels and store
-# the result in XXHASH_DIR.
-get_filename_component(XXHASH_DIR "${CMAKE_CURRENT_SOURCE_DIR}" DIRECTORY)
-get_filename_component(XXHASH_DIR "${XXHASH_DIR}" DIRECTORY)
+# We use get_filename_component() to step up two levels and store the result in XXHASH_DIR.
+get_filename_component(XXHASH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
 file(STRINGS "${XXHASH_DIR}/xxhash.h" XXHASH_VERSION_MAJOR REGEX "^#define XXH_VERSION_MAJOR +([0-9]+) *$")
 string(REGEX REPLACE "^#define XXH_VERSION_MAJOR +([0-9]+) *$" "\\1" XXHASH_VERSION_MAJOR "${XXHASH_VERSION_MAJOR}")
