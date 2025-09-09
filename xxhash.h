@@ -5866,15 +5866,25 @@ XXH3_accumulate_512_rvv(  void* XXH_RESTRICT acc,
 
         size_t i;
         for (i = 0; i < XXH_STRIPE_LEN/8; i += vl) {
+            /* data_vec = xinput[i]; */
             vuint64m2_t data_vec = XXH_RVCAST(u8m2_u64m2)(XXH_RVOP(vle8_v_u8m2)((const uint8_t*)(xinput + i), vl * 8));
+            /* key_vec = xsecret[i]; */
             vuint64m2_t key_vec = XXH_RVCAST(u8m2_u64m2)(XXH_RVOP(vle8_v_u8m2)((const uint8_t*)(xsecret + i), vl * 8));
+            /* acc_vec = xacc[i]; */
             vuint64m2_t acc_vec = XXH_RVOP(vle64_v_u64m2)(xacc + i, vl);
+            /* data_key = data_vec ^ key_vec; */
             vuint64m2_t data_key = XXH_RVOP(vxor_vv_u64m2)(data_vec, key_vec, vl);
+            /* data_key_hi = data_key >> 32; */
             vuint64m2_t data_key_hi = XXH_RVOP(vsrl_vx_u64m2)(data_key, 32, vl);
+            /* data_key_lo = data_key & 0xffffffff; */
             vuint64m2_t data_key_lo = XXH_RVOP(vand_vx_u64m2)(data_key, 0xffffffff, vl);
-            vuint64m2_t data_swap = XXH_RVOP(vrgather_vv_u64m2)(data_vec, xswap_mask, vl); /* swap high and low halves */
+            /* swap high and low halves */
+            vuint64m2_t data_swap = XXH_RVOP(vrgather_vv_u64m2)(data_vec, xswap_mask, vl);
+            /* acc_vec += data_key_lo * data_key_hi; */
             acc_vec = XXH_RVOP(vmacc_vv_u64m2)(acc_vec, data_key_lo, data_key_hi, vl);
+            /* acc_vec += data_swap; */
             acc_vec = XXH_RVOP(vadd_vv_u64m2)(acc_vec, data_swap, vl);
+            /* xacc[i] = acc_vec; */
             XXH_RVOP(vse64_v_u64m2)(xacc + i, acc_vec, vl);
         }
     }
@@ -5894,13 +5904,19 @@ XXH3_scrambleAcc_rvv(void* XXH_RESTRICT acc, const void* XXH_RESTRICT secret)
         for (; count > 0; count -= vl, xacc += vl, xsecret += vl*8) {
             vl = XXH_RVOP(vsetvl_e64m2)(count);
             {
-                vuint64m2_t vkey = XXH_RVCAST(u8m2_u64m2)(XXH_RVOP(vle8_v_u8m2)(xsecret, vl*8));
-                vuint64m2_t vacc = XXH_RVOP(vle64_v_u64m2)(xacc, vl);
-                vuint64m2_t vsrl = XXH_RVOP(vsrl_vx_u64m2)(vacc, 47, vl);
-                vacc = XXH_RVOP(vxor_vv_u64m2)(vacc, vsrl, vl);
-                vacc = XXH_RVOP(vxor_vv_u64m2)(vacc, vkey, vl);
-                vacc = XXH_RVOP(vmul_vx_u64m2)(vacc, XXH_PRIME32_1, vl);
-                XXH_RVOP(vse64_v_u64m2)(xacc, vacc, vl);
+                /* key_vec = xsecret[i]; */
+                vuint64m2_t key_vec = XXH_RVCAST(u8m2_u64m2)(XXH_RVOP(vle8_v_u8m2)(xsecret, vl*8));
+                /* acc_vec = xacc[i]; */
+                vuint64m2_t acc_vec = XXH_RVOP(vle64_v_u64m2)(xacc, vl);
+                /* acc_vec ^= acc_vec >> 47; */
+                vuint64m2_t vsrl = XXH_RVOP(vsrl_vx_u64m2)(acc_vec, 47, vl);
+                acc_vec = XXH_RVOP(vxor_vv_u64m2)(acc_vec, vsrl, vl);
+                /* acc_vec ^= key_vec; */
+                acc_vec = XXH_RVOP(vxor_vv_u64m2)(acc_vec, key_vec, vl);
+                /* acc_vec *= XXH_PRIME32_1; */
+                acc_vec = XXH_RVOP(vmul_vx_u64m2)(acc_vec, XXH_PRIME32_1, vl);
+                /* xacc[i] *= acc_vec; */
+                XXH_RVOP(vse64_v_u64m2)(xacc, acc_vec, vl);
             }
         }
     }
